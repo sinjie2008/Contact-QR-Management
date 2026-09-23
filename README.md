@@ -2,39 +2,36 @@
 
 Standalone test site for managing contact QR codes.
 
-## WhatsApp QR — follows QR.io behavior
-QR.io's static WhatsApp QR type asks for:
-- Country code
-- Phone number
-- Message
+## WhatsApp QR — restored from the supplied working v5
 
-QR.io describes this QR type as **Send WhatsApp message**. The generated QR opens WhatsApp for the target number; when a message is supplied it is prefilled.
+The latest site now uses the same WhatsApp feature as the user-provided `contact_qr_test_site_v5(1).html`:
 
-This project now mirrors that behavior using:
-`https://wa.me/<country-code><phone-number>?text=<message>`
+- Combine **WhatsApp Country Code + WhatsApp Phone Number**
+- Build `https://wa.me/<country-code><phone-number>`
+- If **WhatsApp Default Message** has a value, append it as `?text=<encoded message>`
+- Generate the QR from that URL
+- Show **Open WhatsApp**
+- Show **Save .vcf** for the WhatsApp contact
 
-The message is optional in this project. If Country Code or WhatsApp Phone Number is blank, WhatsApp QR displays **N/A**.
-
-Important: this is QR.io-style WhatsApp behavior. It is not the proprietary **WhatsApp → Add via QR code** contact token.
+The display/download QR generation also uses the embedded QR encoder copied from the supplied v5 implementation, including its quiet-zone SVG rendering.
 
 ## WeChat QR
+- WeChat remains image-only in the latest version.
 - WeChat ID alone does not generate a QR.
-- WeChat QR is displayed only when a WeChat QR image or image URL is supplied.
-- Otherwise it displays **N/A**.
+- If neither a WeChat QR image nor image URL is supplied, the table shows **N/A**.
 
 ## V-card QR
-- Generated from contact/company/location fields.
-- Scan with the normal iPhone / Android camera to add/save the contact.
+- Generated from the full available contact/company/location fields.
+- Includes the existing **Download .VCF** action.
 
-## Download QR codes
-- **Download All QR Codes** creates one ZIP containing every available QR for all contacts.
-- **Download QR** in the Action column creates one ZIP containing the available WhatsApp / WeChat / V-card QR files for that contact.
-- N/A QR types are skipped.
+## QR Downloads
+- **Download All QR Codes** downloads all available QR codes in one ZIP.
+- **Download QR** in each row downloads that contact's available WhatsApp / WeChat / V-card QR codes.
+- Missing/N/A QR types are skipped.
 
 ## Other features
 - Search, sorting, status filter and pagination
 - Add / Edit / Remove
 - CSV import/export template
-- QR zoom preview
-- .VCF download
+- Click QR to enlarge
 - Reset Test Data
