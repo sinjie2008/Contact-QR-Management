@@ -2,38 +2,34 @@
 
 Standalone test site for managing contact QR codes.
 
-## QR rules
+## WhatsApp QR — follows QR.io behavior
+QR.io's static WhatsApp QR type asks for:
+- Country code
+- Phone number
+- Message
 
-### WhatsApp QR — direct Add Contact in WhatsApp
-The WhatsApp contact QR accepted by **WhatsApp → New Contact → Add via QR code** is based on a WhatsApp-issued link such as:
+QR.io describes this QR type as **Send WhatsApp message**. The generated QR opens WhatsApp for the target number; when a message is supplied it is prefilled.
 
-`https://wa.me/qr/XXXXXXXXXXXXXX`
+This project now mirrors that behavior using:
+`https://wa.me/<country-code><phone-number>?text=<message>`
 
-The code after `/qr/` is issued by WhatsApp and resolves to the WhatsApp account. It cannot be calculated from the mobile number alone.
+The message is optional in this project. If Country Code or WhatsApp Phone Number is blank, WhatsApp QR displays **N/A**.
 
-The site therefore accepts:
-- a full `https://wa.me/qr/<code>` link,
-- a full `https://api.whatsapp.com/qr/<code>` link, or
-- the WhatsApp-issued code itself.
+Important: this is QR.io-style WhatsApp behavior. It is not the proprietary **WhatsApp → Add via QR code** contact token.
 
-The site then renders that value as a QR. Scanning it in WhatsApp's **Add via QR code** screen should show **Add to Contacts**.
-
-If no WhatsApp contact QR link/code is supplied, the column shows **N/A**.
-
-The site intentionally does **not** use:
-- `https://wa.me/<mobile>` click-to-chat links,
-- SMS links,
-- prefilled messages, or
-- generic vCard data in the WhatsApp QR column.
-
-### WeChat QR
+## WeChat QR
 - WeChat ID alone does not generate a QR.
-- WeChat QR appears only when a WeChat QR image or image URL is provided.
-- Otherwise it shows **N/A**.
+- WeChat QR is displayed only when a WeChat QR image or image URL is supplied.
+- Otherwise it displays **N/A**.
 
-### V-card QR
-- Generated from the contact/company/location fields.
-- Scan with a normal iPhone / Android camera to add/save the contact.
+## V-card QR
+- Generated from contact/company/location fields.
+- Scan with the normal iPhone / Android camera to add/save the contact.
+
+## Download QR codes
+- **Download All QR Codes** creates one ZIP containing every available QR for all contacts.
+- **Download QR** in the Action column creates one ZIP containing the available WhatsApp / WeChat / V-card QR files for that contact.
+- N/A QR types are skipped.
 
 ## Other features
 - Search, sorting, status filter and pagination
