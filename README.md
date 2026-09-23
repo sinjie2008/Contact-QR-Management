@@ -4,28 +4,41 @@ Standalone test site for managing contact QR codes.
 
 ## QR rules
 
-### WhatsApp QR
-- WhatsApp QR is generated automatically from **Mobile**.
-- The generated QR contains a plain WhatsApp link: `https://wa.me/<mobile>`.
-- It does **not** contain a prefilled message.
-- Scan it using the **WhatsApp Camera**.
-- WhatsApp's documented flow is: **WhatsApp link → Open link → Add to Contacts**.
-- If Mobile is blank, WhatsApp QR displays **N/A**.
-- Do **not** use **New Contact → Add via QR code** for this generated link QR; that screen expects WhatsApp's proprietary contact QR.
+### WhatsApp QR — direct Add Contact in WhatsApp
+The WhatsApp contact QR accepted by **WhatsApp → New Contact → Add via QR code** is based on a WhatsApp-issued link such as:
+
+`https://wa.me/qr/XXXXXXXXXXXXXX`
+
+The code after `/qr/` is issued by WhatsApp and resolves to the WhatsApp account. It cannot be calculated from the mobile number alone.
+
+The site therefore accepts:
+- a full `https://wa.me/qr/<code>` link,
+- a full `https://api.whatsapp.com/qr/<code>` link, or
+- the WhatsApp-issued code itself.
+
+The site then renders that value as a QR. Scanning it in WhatsApp's **Add via QR code** screen should show **Add to Contacts**.
+
+If no WhatsApp contact QR link/code is supplied, the column shows **N/A**.
+
+The site intentionally does **not** use:
+- `https://wa.me/<mobile>` click-to-chat links,
+- SMS links,
+- prefilled messages, or
+- generic vCard data in the WhatsApp QR column.
 
 ### WeChat QR
-- WeChat ID alone does **not** generate a QR.
-- WeChat QR is displayed only when a WeChat QR image or `WeChatQRCodeUrl` is provided.
-- Otherwise WeChat QR displays **N/A**.
+- WeChat ID alone does not generate a QR.
+- WeChat QR appears only when a WeChat QR image or image URL is provided.
+- Otherwise it shows **N/A**.
 
 ### V-card QR
-- V-card QR is generated from the contact form data.
-- Scan with the normal iPhone / Android camera to create/save the contact.
+- Generated from the contact/company/location fields.
+- Scan with a normal iPhone / Android camera to add/save the contact.
 
 ## Other features
 - Search, sorting, status filter and pagination
-- Add / Edit / Remove contacts
-- CSV import and matching CSV template
-- QR click-to-enlarge preview
+- Add / Edit / Remove
+- CSV import/export template
+- QR zoom preview
 - .VCF download
 - Reset Test Data
