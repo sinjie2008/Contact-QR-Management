@@ -26,7 +26,7 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 <div class="wrap"><div class="panel">
 <h1>Contact QR Management</h1>
 <p class="sub">Test site with searchable/sortable contact listing, CSV import, WhatsApp QR, WeChat QR and V-card QR.</p>
-<div class="notice"><b>QR rules:</b> <b>WhatsApp QR</b> is generated automatically from Mobile as a plain <code>wa.me</code> WhatsApp link QR. Scan it with the <b>WhatsApp Camera</b>, then choose <b>WhatsApp link → Open link → Add to Contacts</b>. If Mobile is blank, it shows <b>N/A</b>. <b>WeChat QR</b> is image-only; without an uploaded image or image URL it shows <b>N/A</b>.</div>
+<div class="notice"><b>QR rules:</b> <b>WhatsApp QR</b> uses the official WhatsApp contact-QR link format <code>https://wa.me/qr/&lt;code&gt;</code>. Enter the WhatsApp-issued QR link/code in the form; the site generates the QR image from that link. A mobile number alone cannot produce this WhatsApp-issued code. <b>WeChat QR</b> remains image-only. Missing required QR data shows <b>N/A</b>.</div>
 <div id="msg" class="msg"></div>
 <div class="toolbar">
 <button class="btn primary" id="addBtn">+ Add Contact</button>
@@ -76,6 +76,7 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 
 <div class="full"><hr class="sep"><div class="section">5. QR Settings</div></div>
 <div class="field"><label>WeChat ID</label><input id="wechatId"></div>
+<div class="field full"><label>WhatsApp Contact QR Link / Code</label><input id="whatsappContactQr" placeholder="https://wa.me/qr/XXXXXXXXXXXXXX"><div class="help">Use the QR link/code issued by WhatsApp for this person's contact QR. This is the format accepted by WhatsApp → Add via QR code. Mobile alone cannot generate this code.</div></div>
 <div class="field full"><label>WeChat QR Image URL</label><input id="wechatQrUrl"><div class="help">Required to display WeChat QR unless you upload an image below. WeChat ID alone will not generate a QR.</div></div>
 <div class="field full"><label>Or upload WeChat QR image (manual only)</label><input id="wechatQrFile" type="file" accept="image/*"><div class="help">If both the URL and uploaded image are blank, the WeChat QR column shows N/A.</div><div id="wcPreview" class="preview hidden"><img id="wcImg"><span class="muted">Stored in this browser.</span></div></div>
 
@@ -89,7 +90,7 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 <script>
 (function(){
 "use strict";
-var KEY="contactQrManagement_v17",PAGE=10,contacts=[],page=1,sortKey="contactName",sortDir="asc",pendingWc="";
+var KEY="contactQrManagement_v18",PAGE=10,contacts=[],page=1,sortKey="contactName",sortDir="asc",pendingWc="";
 function $(id){return document.getElementById(id)}
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -106,13 +107,19 @@ var a=[
 ["hk-service","Jason","Wong","+852 2345 6789","+852 9123 4567","jason.wong@superworld-demo.hk","https://www.superworld-demo.hk","Superworld Electronics Hong Kong","Customer Service Specialist","+852 2345 6790","18 Harbour Road, Wan Chai","Hong Kong","999077","Hong Kong","superworld_hk_service",false]
 ];
 return a.map(function(x){
-return {id:x[0],contactName:x[1]+" "+x[2],firstName:x[1],lastName:x[2],phoneNumber:x[3],mobile:x[4],email:x[5],website:x[6],company:x[7],jobTitle:x[8],fax:x[9],address:x[10],city:x[11],postCode:x[12],country:x[13],wechatId:x[14],wechatQrUrl:"",wechatQrData:"",isActive:x[15]};
+return {id:x[0],contactName:x[1]+" "+x[2],firstName:x[1],lastName:x[2],phoneNumber:x[3],mobile:x[4],email:x[5],website:x[6],company:x[7],jobTitle:x[8],fax:x[9],address:x[10],city:x[11],postCode:x[12],country:x[13],wechatId:x[14],whatsappContactQr:"",wechatQrUrl:"",wechatQrData:"",isActive:x[15]};
 });
 }
 function load(){try{var x=JSON.parse(localStorage.getItem(KEY)||"null");return Array.isArray(x)?x:sample()}catch(e){return sample()}}
 function save(){localStorage.setItem(KEY,JSON.stringify(contacts))}
 function phone(r){return String(r.mobile||r.phoneNumber||"").trim()}
-function waLink(r){var n=digits(r.mobile||"");return n?"https://wa.me/"+n:""}
+function whatsappContactQrLink(r){
+var raw=String(r.whatsappContactQr||"").trim();
+if(!raw)return "";
+if(/^[A-Za-z0-9]{8,32}$/.test(raw))return "https://wa.me/qr/"+raw;
+var m=raw.match(/^https:\/\/(?:wa\.me\/qr\/|api\.whatsapp\.com\/qr\/)([A-Za-z0-9]+)(?:[?#].*)?$/i);
+return m?"https://wa.me/qr/"+m[1]:"";
+}
 function vEsc(v){return String(v||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function vcard(r){
 var first=String(r.firstName||"").trim(),last=String(r.lastName||"").trim(),full=(first+" "+last).trim()||r.contactName||"Contact",L=["BEGIN:VCARD","VERSION:3.0","N:"+vEsc(last)+";"+vEsc(first)+";;;","FN:"+vEsc(full)];
@@ -146,8 +153,8 @@ return a}
 function render(){
 var rows=sortedRows(),pages=Math.max(1,Math.ceil(rows.length/PAGE));if(page>pages)page=pages;var start=(page-1)*PAGE,show=rows.slice(start,start+PAGE),html="";
 show.forEach(function(r){
-var w=waLink(r),vc=hasVcard(r)?vcard(r):"";
-var wa=w?qrHtml("WhatsApp Link",r,w,""):'<span class="muted">N/A</span>';
+var w=whatsappContactQrLink(r),vc=hasVcard(r)?vcard(r):"";
+var wa=w?qrHtml("WhatsApp Contact",r,w,""):'<span class="muted">N/A</span>';
 var we=(r.wechatQrData||r.wechatQrUrl)?qrHtml("WeChat",r,"",r.wechatQrData||r.wechatQrUrl):'<span class="muted">N/A</span>';
 var vv=vc?qrHtml("V-card",r,vc,""):'<span class="muted">N/A</span>';
 html+='<tr><td class="name">'+esc(r.contactName)+'</td><td class="nowrap">'+esc(r.mobile||r.phoneNumber||"N/A")+'</td><td>'+esc(r.email||"N/A")+'</td><td>'+esc(r.company||"N/A")+'</td><td>'+esc(r.jobTitle||"N/A")+'</td><td>'+esc(r.country||"N/A")+'</td><td>'+esc(r.wechatId||"N/A")+'</td>';
@@ -162,13 +169,13 @@ document.querySelectorAll("th.sort").forEach(function(th){th.querySelector(".arr
 function reset(){contacts=sample();page=1;save();render();msg("Test data restored.")}
 function openAdd(){pendingWc="";$("form").reset();$("id").value="";$("isActive").value="true";$("wcPreview").classList.add("hidden");$("editTitle").textContent="Add Contact";$("editDialog").showModal()}
 function openEdit(id){
-var r=contacts.find(function(x){return x.id===id});if(!r)return;$("editTitle").textContent="Edit Contact";["firstName","lastName","phoneNumber","mobile","email","website","company","jobTitle","fax","address","city","postCode","country","wechatId","wechatQrUrl"].forEach(function(k){$(k).value=r[k]||""});$("id").value=r.id;$("isActive").value=String(!!r.isActive);pendingWc=r.wechatQrData||"";$("wcPreview").classList.toggle("hidden",!pendingWc);if(pendingWc)$("wcImg").src=pendingWc;$("editDialog").showModal()}
+var r=contacts.find(function(x){return x.id===id});if(!r)return;$("editTitle").textContent="Edit Contact";["firstName","lastName","phoneNumber","mobile","email","website","company","jobTitle","fax","address","city","postCode","country","wechatId","whatsappContactQr","wechatQrUrl"].forEach(function(k){$(k).value=r[k]||""});$("id").value=r.id;$("isActive").value=String(!!r.isActive);pendingWc=r.wechatQrData||"";$("wcPreview").classList.toggle("hidden",!pendingWc);if(pendingWc)$("wcImg").src=pendingWc;$("editDialog").showModal()}
 function remove(id){var r=contacts.find(function(x){return x.id===id});if(!r||!confirm('Remove "'+r.contactName+'"?'))return;contacts=contacts.filter(function(x){return x.id!==id});save();render();msg("Contact removed.")}
 function downloadVcf(id){var r=contacts.find(function(x){return x.id===id});if(!r)return;var b=new Blob([vcard(r)],{type:"text/vcard;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(r.contactName||"contact").replace(/\s+/g,"_")+".vcf";a.click();URL.revokeObjectURL(u)}
 function csvQuote(v){v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
-var CSVH=["FirstName","LastName","PhoneNumber","Mobile","Email","WebsiteURL","Company","JobTitle","Fax","Address","City","PostCode","Country","WeChatId","WeChatQRCodeUrl","Status"];
+var CSVH=["FirstName","LastName","PhoneNumber","Mobile","Email","WebsiteURL","Company","JobTitle","Fax","Address","City","PostCode","Country","WeChatId","WhatsAppContactQRLink","WeChatQRCodeUrl","Status"];
 function csvTemplate(){
-var r=sample()[0],a=[r.firstName,r.lastName,r.phoneNumber,r.mobile,r.email,r.website,r.company,r.jobTitle,r.fax,r.address,r.city,r.postCode,r.country,r.wechatId,r.wechatQrUrl,r.isActive?"Active":"Inactive"];
+var r=sample()[0],a=[r.firstName,r.lastName,r.phoneNumber,r.mobile,r.email,r.website,r.company,r.jobTitle,r.fax,r.address,r.city,r.postCode,r.country,r.wechatId,r.whatsappContactQr,r.wechatQrUrl,r.isActive?"Active":"Inactive"];
 return CSVH.join(",")+"\r\n"+a.map(csvQuote).join(",")+"\r\n"}
 function downloadCsv(){var b=new Blob(["\ufeff"+csvTemplate()],{type:"text/csv;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="contact_qr_import_template.csv";a.click();URL.revokeObjectURL(u)}
 function parseCsv(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){f+='"';i++}else if(c==='"')q=false;else f+=c}else{if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"){row.push(f);rows.push(row);row=[];f=""}else if(c!=="\r")f+=c}}if(f||row.length){row.push(f);rows.push(row)}return rows.filter(function(r){return r.some(function(v){return String(v).trim()})})}
@@ -177,17 +184,17 @@ function importCsv(t){
 var rows=parseCsv(t);if(rows.length<2)throw Error("CSV has no data rows.");var h=rows[0].map(norm),added=0;
 for(var i=1;i<rows.length;i++){var o={};h.forEach(function(k,j){o[k]=rows[i][j]||""});function v(){for(var z=0;z<arguments.length;z++){var x=o[norm(arguments[z])];if(x!==undefined)return String(x).trim()}return ""}
 var fn=v("FirstName"),ln=v("LastName");if(!fn&&!ln)continue;var st=v("Status","IsActive")||"Active";
-contacts.push({id:uid(),contactName:(fn+" "+ln).trim()||"Unnamed Contact",firstName:fn,lastName:ln,phoneNumber:v("PhoneNumber"),mobile:v("Mobile"),email:v("Email","E-mail"),website:v("WebsiteURL","Website"),company:v("Company"),jobTitle:v("JobTitle"),fax:v("Fax"),address:v("Address"),city:v("City"),postCode:v("PostCode"),country:v("Country"),wechatId:v("WeChatId"),wechatQrUrl:v("WeChatQRCodeUrl"),wechatQrData:"",isActive:["inactive","false","no","0"].indexOf(st.toLowerCase())<0});added++}
+contacts.push({id:uid(),contactName:(fn+" "+ln).trim()||"Unnamed Contact",firstName:fn,lastName:ln,phoneNumber:v("PhoneNumber"),mobile:v("Mobile"),email:v("Email","E-mail"),website:v("WebsiteURL","Website"),company:v("Company"),jobTitle:v("JobTitle"),fax:v("Fax"),address:v("Address"),city:v("City"),postCode:v("PostCode"),country:v("Country"),wechatId:v("WeChatId"),whatsappContactQr:v("WhatsAppContactQRLink","WhatsApp Contact QR Link","WhatsAppQRLink"),wechatQrUrl:v("WeChatQRCodeUrl"),wechatQrData:"",isActive:["inactive","false","no","0"].indexOf(st.toLowerCase())<0});added++}
 if(!added)throw Error("No valid contacts found.");save();page=1;render();return added}
 function bindUpload(input,preview,img,setter){$(input).addEventListener("change",function(e){var f=e.target.files[0];if(!f){setter("");$(preview).classList.add("hidden");return}var rd=new FileReader();rd.onload=function(){setter(rd.result);$(img).src=rd.result;$(preview).classList.remove("hidden")};rd.readAsDataURL(f)})}
-function qrPreview(el){var title=el.getAttribute("data-name")+" - "+el.getAttribute("data-type")+" QR",p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");$("qrTitle").textContent=title;$("qrBig").innerHTML="";if(img){var i=new Image();i.src=img;$("qrBig").appendChild(i)}else if(p)qrcode($("qrBig"),p,320);$("qrNote").textContent=el.getAttribute("data-type")==="V-card"?"Scan with the normal phone camera to add/save the contact.":el.getAttribute("data-type")==="WhatsApp Link"?"Scan with the WhatsApp Camera. Then tap WhatsApp link → Open link → Add to Contacts. Do not use New Contact → Add via QR code for this generated link QR.":"Scan this uploaded WeChat QR in WeChat.";$("qrDialog").showModal()}
+function qrPreview(el){var title=el.getAttribute("data-name")+" - "+el.getAttribute("data-type")+" QR",p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");$("qrTitle").textContent=title;$("qrBig").innerHTML="";if(img){var i=new Image();i.src=img;$("qrBig").appendChild(i)}else if(p)qrcode($("qrBig"),p,320);$("qrNote").textContent=el.getAttribute("data-type")==="V-card"?"Scan with the normal phone camera to add/save the contact.":el.getAttribute("data-type")==="WhatsApp Contact"?"Scan with WhatsApp → New Contact → Add via QR code, then tap Add to Contacts.":"Scan this uploaded WeChat QR in WeChat.";$("qrDialog").showModal()}
 contacts=load();render();
 $("addBtn").onclick=openAdd;$("downloadBtn").onclick=downloadCsv;$("resetBtn").onclick=reset;$("closeEdit").onclick=function(){$("editDialog").close()};$("cancel").onclick=function(){$("editDialog").close()};$("closeQr").onclick=function(){$("qrDialog").close()};
 $("search").oninput=function(){page=1;render()};$("status").onchange=function(){page=1;render()};$("prev").onclick=function(){if(page>1){page--;render()}};$("next").onclick=function(){page++;render()};
 document.querySelector("thead").addEventListener("click",function(e){var th=e.target.closest("th.sort");if(!th)return;var k=th.getAttribute("data-k");if(sortKey===k)sortDir=sortDir==="asc"?"desc":"asc";else{sortKey=k;sortDir="asc"}page=1;render()});
 $("tbody").addEventListener("click",function(e){var q=e.target.closest(".qr");if(q){qrPreview(q);return}var b=e.target.closest("[data-a]");if(!b)return;var a=b.getAttribute("data-a"),id=b.getAttribute("data-id");if(a==="edit")openEdit(id);else if(a==="remove")remove(id);else if(a==="vcf")downloadVcf(id)});
 bindUpload("wechatQrFile","wcPreview","wcImg",function(v){pendingWc=v});
-$("form").addEventListener("submit",function(e){e.preventDefault();var fn=$("firstName").value.trim(),ln=$("lastName").value.trim(),mob=$("mobile").value.trim();if(!fn||!ln){msg("First name and Last name are required.",true);return}if(!mob){msg("Mobile is required.",true);return}var id=$("id").value,old=id?contacts.find(function(x){return x.id===id}):null,r={id:id||uid(),contactName:fn+" "+ln,firstName:fn,lastName:ln,phoneNumber:$("phoneNumber").value.trim(),mobile:mob,email:$("email").value.trim(),website:$("website").value.trim(),company:$("company").value.trim(),jobTitle:$("jobTitle").value.trim(),fax:$("fax").value.trim(),address:$("address").value.trim(),city:$("city").value.trim(),postCode:$("postCode").value.trim(),country:$("country").value.trim(),wechatId:$("wechatId").value.trim(),wechatQrUrl:$("wechatQrUrl").value.trim(),wechatQrData:pendingWc||(old?old.wechatQrData:""),isActive:$("isActive").value==="true"};if(id){var n=contacts.findIndex(function(x){return x.id===id});if(n>=0)contacts[n]=r}else contacts.push(r);save();render();$("editDialog").close();msg(id?"Contact updated.":"Contact added.")});
+$("form").addEventListener("submit",function(e){e.preventDefault();var fn=$("firstName").value.trim(),ln=$("lastName").value.trim(),mob=$("mobile").value.trim();if(!fn||!ln){msg("First name and Last name are required.",true);return}if(!mob){msg("Mobile is required.",true);return}var id=$("id").value,old=id?contacts.find(function(x){return x.id===id}):null,r={id:id||uid(),contactName:fn+" "+ln,firstName:fn,lastName:ln,phoneNumber:$("phoneNumber").value.trim(),mobile:mob,email:$("email").value.trim(),website:$("website").value.trim(),company:$("company").value.trim(),jobTitle:$("jobTitle").value.trim(),fax:$("fax").value.trim(),address:$("address").value.trim(),city:$("city").value.trim(),postCode:$("postCode").value.trim(),country:$("country").value.trim(),wechatId:$("wechatId").value.trim(),whatsappContactQr:$("whatsappContactQr").value.trim(),wechatQrUrl:$("wechatQrUrl").value.trim(),wechatQrData:pendingWc||(old?old.wechatQrData:""),isActive:$("isActive").value==="true"};if(id){var n=contacts.findIndex(function(x){return x.id===id});if(n>=0)contacts[n]=r}else contacts.push(r);save();render();$("editDialog").close();msg(id?"Contact updated.":"Contact added.")});
 $("csvFile").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{msg(importCsv(rd.result)+" contact(s) imported.")}catch(x){msg("CSV import failed: "+x.message,true)}e.target.value=""};rd.readAsText(f)});
 })();
 </script>
