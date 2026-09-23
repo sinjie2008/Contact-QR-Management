@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Contact QR Management</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{--bg:#f5f7fb;--panel:#fff;--line:#dfe4ec;--text:#172033;--muted:#667085;--blue:#2563eb;--red:#b42318;--green:#067647}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
@@ -26,12 +27,13 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 <div class="wrap"><div class="panel">
 <h1>Contact QR Management</h1>
 <p class="sub">Test site with searchable/sortable contact listing, CSV import, WhatsApp QR, WeChat QR and V-card QR.</p>
-<div class="notice"><b>QR rules:</b> <b>WhatsApp QR</b> uses the official WhatsApp contact-QR link format <code>https://wa.me/qr/&lt;code&gt;</code>. Enter the WhatsApp-issued QR link/code in the form; the site generates the QR image from that link. A mobile number alone cannot produce this WhatsApp-issued code. <b>WeChat QR</b> remains image-only. Missing required QR data shows <b>N/A</b>.</div>
+<div class="notice"><b>WhatsApp behavior now follows QR.io:</b> Country code + Phone number + optional WhatsApp message are encoded into a WhatsApp link QR. Scanning opens WhatsApp for that number. <b>WeChat QR</b> remains image-only. Missing required QR data shows <b>N/A</b>.</div>
 <div id="msg" class="msg"></div>
 <div class="toolbar">
 <button class="btn primary" id="addBtn">+ Add Contact</button>
 <label class="btn filebtn">Import CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label>
 <button class="btn" id="downloadBtn">Download CSV Template</button>
+<button class="btn" id="downloadAllQrBtn">Download All QR Codes</button>
 <button class="btn" id="resetBtn">Reset Test Data</button>
 <span class="grow"></span><span class="muted" id="count"></span>
 </div>
@@ -76,7 +78,10 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 
 <div class="full"><hr class="sep"><div class="section">5. QR Settings</div></div>
 <div class="field"><label>WeChat ID</label><input id="wechatId"></div>
-<div class="field full"><label>WhatsApp Contact QR Link / Code</label><input id="whatsappContactQr" placeholder="https://wa.me/qr/XXXXXXXXXXXXXX"><div class="help">Use the QR link/code issued by WhatsApp for this person's contact QR. This is the format accepted by WhatsApp → Add via QR code. Mobile alone cannot generate this code.</div></div>
+<div class="full"><div class="section">WhatsApp QR (QR.io style)</div><div class="help">QR.io uses Country code + Phone number + Message for its WhatsApp QR type.</div></div>
+<div class="field"><label>WhatsApp country code *</label><input id="whatsappCountryCode" placeholder="+65"></div>
+<div class="field"><label>WhatsApp phone number *</label><input id="whatsappPhoneNumber" placeholder="91234567"></div>
+<div class="field full"><label>WhatsApp message <span class="muted">(optional)</span></label><input id="whatsappMessage" placeholder="Hi, I would like to know more."></div>
 <div class="field full"><label>WeChat QR Image URL</label><input id="wechatQrUrl"><div class="help">Required to display WeChat QR unless you upload an image below. WeChat ID alone will not generate a QR.</div></div>
 <div class="field full"><label>Or upload WeChat QR image (manual only)</label><input id="wechatQrFile" type="file" accept="image/*"><div class="help">If both the URL and uploaded image are blank, the WeChat QR column shows N/A.</div><div id="wcPreview" class="preview hidden"><img id="wcImg"><span class="muted">Stored in this browser.</span></div></div>
 
@@ -90,7 +95,7 @@ dialog{width:min(820px,calc(100vw - 24px));border:0;border-radius:14px;padding:0
 <script>
 (function(){
 "use strict";
-var KEY="contactQrManagement_v18",PAGE=10,contacts=[],page=1,sortKey="contactName",sortDir="asc",pendingWc="";
+var KEY="contactQrManagement_v19",PAGE=10,contacts=[],page=1,sortKey="contactName",sortDir="asc",pendingWc="";
 function $(id){return document.getElementById(id)}
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -100,25 +105,25 @@ function msg(t,err){var e=$("msg");e.textContent=t;e.className="msg show"+(err?"
 function qrServer(payload){return "https://api.qrserver.com/v1/create-qr-code/?size=260x260&data="+encodeURIComponent(payload)}
 function sample(){
 var a=[
-["sg-sales","John","Tan","+65 6123 4567","+65 9123 4567","john.tan@superworld-demo.com","https://www.superworld-demo.com/sg","Superworld Electronics Singapore","Regional Sales Manager","+65 6123 4568","10 Kallang Avenue #08-01","Singapore","339510","Singapore","superworld_sg_sales",true],
-["cn-sales","Li","Wei","+86 21 5555 1000","+86 138 0013 8000","li.wei@superworld-demo.cn","https://www.superworld-demo.cn","Superworld Electronics China","Key Account Manager","+86 21 5555 1001","88 Example Road, Pudong","Shanghai","200120","China","superworld_cn_sales",true],
-["my-sales","Aiman","Lee","+60 3 1234 5678","+60 12 345 6789","aiman.lee@superworld-demo.my","https://www.superworld-demo.my","Superworld Electronics Malaysia","Sales Executive","+60 3 1234 5679","25 Jalan Example, Suite 12-3","Kuala Lumpur","50000","Malaysia","superworld_my_sales",true],
-["tw-support","Mei","Chen","+886 2 2345 6789","+886 912 345 678","mei.chen@superworld-demo.tw","https://www.superworld-demo.tw","Superworld Electronics Taiwan","Technical Support Engineer","+886 2 2345 6790","100 Zhongxiao East Road","Taipei","100","Taiwan","superworld_tw_support",true],
-["hk-service","Jason","Wong","+852 2345 6789","+852 9123 4567","jason.wong@superworld-demo.hk","https://www.superworld-demo.hk","Superworld Electronics Hong Kong","Customer Service Specialist","+852 2345 6790","18 Harbour Road, Wan Chai","Hong Kong","999077","Hong Kong","superworld_hk_service",false]
+["sg-sales","John","Tan","+65 6123 4567","+65 9123 4567","john.tan@superworld-demo.com","https://www.superworld-demo.com/sg","Superworld Electronics Singapore","Regional Sales Manager","+65 6123 4568","10 Kallang Avenue #08-01","Singapore","339510","Singapore","superworld_sg_sales","+65","91234567","Hi, I would like to know more about your products.",true],
+["cn-sales","Li","Wei","+86 21 5555 1000","+86 138 0013 8000","li.wei@superworld-demo.cn","https://www.superworld-demo.cn","Superworld Electronics China","Key Account Manager","+86 21 5555 1001","88 Example Road, Pudong","Shanghai","200120","China","superworld_cn_sales","+86","13800138000","Hello, I would like more information about your products.",true],
+["my-sales","Aiman","Lee","+60 3 1234 5678","+60 12 345 6789","aiman.lee@superworld-demo.my","https://www.superworld-demo.my","Superworld Electronics Malaysia","Sales Executive","+60 3 1234 5679","25 Jalan Example, Suite 12-3","Kuala Lumpur","50000","Malaysia","superworld_my_sales","+60","123456789","Hi, please send me more product details.",true],
+["tw-support","Mei","Chen","+886 2 2345 6789","+886 912 345 678","mei.chen@superworld-demo.tw","https://www.superworld-demo.tw","Superworld Electronics Taiwan","Technical Support Engineer","+886 2 2345 6790","100 Zhongxiao East Road","Taipei","100","Taiwan","superworld_tw_support","+886","912345678","Hi, I need technical support for a product.",true],
+["hk-service","Jason","Wong","+852 2345 6789","+852 9123 4567","jason.wong@superworld-demo.hk","https://www.superworld-demo.hk","Superworld Electronics Hong Kong","Customer Service Specialist","+852 2345 6790","18 Harbour Road, Wan Chai","Hong Kong","999077","Hong Kong","superworld_hk_service","+852","91234567","Hi, I would like help with my enquiry.",false]
 ];
 return a.map(function(x){
-return {id:x[0],contactName:x[1]+" "+x[2],firstName:x[1],lastName:x[2],phoneNumber:x[3],mobile:x[4],email:x[5],website:x[6],company:x[7],jobTitle:x[8],fax:x[9],address:x[10],city:x[11],postCode:x[12],country:x[13],wechatId:x[14],whatsappContactQr:"",wechatQrUrl:"",wechatQrData:"",isActive:x[15]};
+return {id:x[0],contactName:x[1]+" "+x[2],firstName:x[1],lastName:x[2],phoneNumber:x[3],mobile:x[4],email:x[5],website:x[6],company:x[7],jobTitle:x[8],fax:x[9],address:x[10],city:x[11],postCode:x[12],country:x[13],wechatId:x[14],whatsappCountryCode:x[15],whatsappPhoneNumber:x[16],whatsappMessage:x[17],wechatQrUrl:"",wechatQrData:"",isActive:x[18]};
 });
 }
 function load(){try{var x=JSON.parse(localStorage.getItem(KEY)||"null");return Array.isArray(x)?x:sample()}catch(e){return sample()}}
 function save(){localStorage.setItem(KEY,JSON.stringify(contacts))}
 function phone(r){return String(r.mobile||r.phoneNumber||"").trim()}
-function whatsappContactQrLink(r){
-var raw=String(r.whatsappContactQr||"").trim();
-if(!raw)return "";
-if(/^[A-Za-z0-9]{8,32}$/.test(raw))return "https://wa.me/qr/"+raw;
-var m=raw.match(/^https:\/\/(?:wa\.me\/qr\/|api\.whatsapp\.com\/qr\/)([A-Za-z0-9]+)(?:[?#].*)?$/i);
-return m?"https://wa.me/qr/"+m[1]:"";
+function whatsappQrPayload(r){
+var cc=digits(r.whatsappCountryCode||""),num=digits(r.whatsappPhoneNumber||"");
+if(!cc||!num)return "";
+var full=cc+num,u="https://wa.me/"+full,m=String(r.whatsappMessage||"").trim();
+if(m)u+="?text="+encodeURIComponent(m);
+return u;
 }
 function vEsc(v){return String(v||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function vcard(r){
@@ -153,14 +158,14 @@ return a}
 function render(){
 var rows=sortedRows(),pages=Math.max(1,Math.ceil(rows.length/PAGE));if(page>pages)page=pages;var start=(page-1)*PAGE,show=rows.slice(start,start+PAGE),html="";
 show.forEach(function(r){
-var w=whatsappContactQrLink(r),vc=hasVcard(r)?vcard(r):"";
-var wa=w?qrHtml("WhatsApp Contact",r,w,""):'<span class="muted">N/A</span>';
+var w=whatsappQrPayload(r),vc=hasVcard(r)?vcard(r):"";
+var wa=w?qrHtml("WhatsApp",r,w,""):'<span class="muted">N/A</span>';
 var we=(r.wechatQrData||r.wechatQrUrl)?qrHtml("WeChat",r,"",r.wechatQrData||r.wechatQrUrl):'<span class="muted">N/A</span>';
 var vv=vc?qrHtml("V-card",r,vc,""):'<span class="muted">N/A</span>';
 html+='<tr><td class="name">'+esc(r.contactName)+'</td><td class="nowrap">'+esc(r.mobile||r.phoneNumber||"N/A")+'</td><td>'+esc(r.email||"N/A")+'</td><td>'+esc(r.company||"N/A")+'</td><td>'+esc(r.jobTitle||"N/A")+'</td><td>'+esc(r.country||"N/A")+'</td><td>'+esc(r.wechatId||"N/A")+'</td>';
 html+='<td class="qrcell">'+wa+'</td>';
 html+='<td class="qrcell">'+we+'</td><td class="qrcell">'+vv+(vc?'<div class="qractions"><button class="qrbtn" data-a="vcf" data-id="'+esc(r.id)+'">Download .VCF</button></div>':"")+'</td>';
-html+='<td><span class="pill '+(r.isActive?"active":"inactive")+'">'+(r.isActive?"Active":"Inactive")+'</span></td><td><div class="actions"><button class="btn small" data-a="edit" data-id="'+esc(r.id)+'">Edit</button><button class="btn small danger" data-a="remove" data-id="'+esc(r.id)+'">Remove</button></div></td></tr>';
+html+='<td><span class="pill '+(r.isActive?"active":"inactive")+'">'+(r.isActive?"Active":"Inactive")+'</span></td><td><div class="actions"><button class="btn small" data-a="downloadqr" data-id="'+esc(r.id)+'">Download QR</button><button class="btn small" data-a="edit" data-id="'+esc(r.id)+'">Edit</button><button class="btn small danger" data-a="remove" data-id="'+esc(r.id)+'">Remove</button></div></td></tr>';
 });
 $("tbody").innerHTML=html||'<tr><td colspan="12" class="muted" style="text-align:center;padding:28px">No matching contacts.</td></tr>';
 document.querySelectorAll(".qr").forEach(function(el){var p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");if(img){var i=new Image();i.src=img;i.alt="QR";el.appendChild(i)}else if(p)qrcode(el,p,78)});
@@ -169,13 +174,55 @@ document.querySelectorAll("th.sort").forEach(function(th){th.querySelector(".arr
 function reset(){contacts=sample();page=1;save();render();msg("Test data restored.")}
 function openAdd(){pendingWc="";$("form").reset();$("id").value="";$("isActive").value="true";$("wcPreview").classList.add("hidden");$("editTitle").textContent="Add Contact";$("editDialog").showModal()}
 function openEdit(id){
-var r=contacts.find(function(x){return x.id===id});if(!r)return;$("editTitle").textContent="Edit Contact";["firstName","lastName","phoneNumber","mobile","email","website","company","jobTitle","fax","address","city","postCode","country","wechatId","whatsappContactQr","wechatQrUrl"].forEach(function(k){$(k).value=r[k]||""});$("id").value=r.id;$("isActive").value=String(!!r.isActive);pendingWc=r.wechatQrData||"";$("wcPreview").classList.toggle("hidden",!pendingWc);if(pendingWc)$("wcImg").src=pendingWc;$("editDialog").showModal()}
+var r=contacts.find(function(x){return x.id===id});if(!r)return;$("editTitle").textContent="Edit Contact";["firstName","lastName","phoneNumber","mobile","email","website","company","jobTitle","fax","address","city","postCode","country","wechatId","whatsappCountryCode","whatsappPhoneNumber","whatsappMessage","wechatQrUrl"].forEach(function(k){$(k).value=r[k]||""});$("id").value=r.id;$("isActive").value=String(!!r.isActive);pendingWc=r.wechatQrData||"";$("wcPreview").classList.toggle("hidden",!pendingWc);if(pendingWc)$("wcImg").src=pendingWc;$("editDialog").showModal()}
 function remove(id){var r=contacts.find(function(x){return x.id===id});if(!r||!confirm('Remove "'+r.contactName+'"?'))return;contacts=contacts.filter(function(x){return x.id!==id});save();render();msg("Contact removed.")}
 function downloadVcf(id){var r=contacts.find(function(x){return x.id===id});if(!r)return;var b=new Blob([vcard(r)],{type:"text/vcard;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=(r.contactName||"contact").replace(/\s+/g,"_")+".vcf";a.click();URL.revokeObjectURL(u)}
+function safeName(v){return String(v||"contact").trim().replace(/[^A-Za-z0-9._-]+/g,"_").replace(/^_+|_+$/g,"")||"contact"}
+function qrDataUrl(payload,size){
+return new Promise(function(resolve,reject){
+var box=document.createElement("div");box.style.position="fixed";box.style.left="-10000px";box.style.top="-10000px";document.body.appendChild(box);
+try{
+new QRCode(box,{text:payload,width:size||600,height:size||600,correctLevel:QRCode.CorrectLevel.M});
+setTimeout(function(){
+try{
+var canvas=box.querySelector("canvas"),img=box.querySelector("img"),src=canvas?canvas.toDataURL("image/png"):(img&&img.src?img.src:"");
+box.remove();if(src)resolve(src);else reject(Error("Unable to render QR image."));
+}catch(e){box.remove();reject(e)}
+},80);
+}catch(e){box.remove();reject(e)}
+});
+}
+function dataUrlBase64(dataUrl){var p=String(dataUrl||"").split(",");return p.length>1?p[1]:""}
+async function addImageToZip(zip,path,src){
+if(!src)return false;
+if(/^data:image\//i.test(src)){zip.file(path,dataUrlBase64(src),{base64:true});return true}
+try{var res=await fetch(src);if(!res.ok)throw Error("HTTP "+res.status);zip.file(path,await res.blob());return true}catch(e){return false}
+}
+async function addContactQrFiles(zip,r,folder){
+var count=0,w=whatsappQrPayload(r),vc=hasVcard(r)?vcard(r):"",base=(folder?folder+"/":"");
+if(w){zip.file(base+"WhatsApp_QR.png",dataUrlBase64(await qrDataUrl(w,600)),{base64:true});count++}
+if(r.wechatQrData||r.wechatQrUrl){if(await addImageToZip(zip,base+"WeChat_QR.png",r.wechatQrData||r.wechatQrUrl))count++}
+if(vc){zip.file(base+"V-card_QR.png",dataUrlBase64(await qrDataUrl(vc,600)),{base64:true});count++}
+return count;
+}
+function saveBlob(blob,name){var u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1000)}
+async function downloadContactQrs(id){
+var r=contacts.find(function(x){return x.id===id});if(!r)return;
+try{var zip=new JSZip(),n=await addContactQrFiles(zip,r,"");if(!n){msg("No QR code available for this contact.",true);return}
+saveBlob(await zip.generateAsync({type:"blob"}),safeName(r.contactName)+"_QR_Codes.zip");msg("QR download ready.");}
+catch(e){msg("QR download failed: "+e.message,true)}
+}
+async function downloadAllQrs(){
+try{var zip=new JSZip(),total=0;
+for(var i=0;i<contacts.length;i++){var r=contacts[i],folder=String(i+1).padStart(2,"0")+"_"+safeName(r.contactName);total+=await addContactQrFiles(zip,r,folder)}
+if(!total){msg("No QR codes available to download.",true);return}
+saveBlob(await zip.generateAsync({type:"blob"}),"All_Contact_QR_Codes.zip");msg(total+" QR code(s) downloaded in ZIP.");}
+catch(e){msg("Download All failed: "+e.message,true)}
+}
 function csvQuote(v){v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
-var CSVH=["FirstName","LastName","PhoneNumber","Mobile","Email","WebsiteURL","Company","JobTitle","Fax","Address","City","PostCode","Country","WeChatId","WhatsAppContactQRLink","WeChatQRCodeUrl","Status"];
+var CSVH=["FirstName","LastName","PhoneNumber","Mobile","Email","WebsiteURL","Company","JobTitle","Fax","Address","City","PostCode","Country","WeChatId","WhatsAppCountryCode","WhatsAppPhoneNumber","WhatsAppMessage","WeChatQRCodeUrl","Status"];
 function csvTemplate(){
-var r=sample()[0],a=[r.firstName,r.lastName,r.phoneNumber,r.mobile,r.email,r.website,r.company,r.jobTitle,r.fax,r.address,r.city,r.postCode,r.country,r.wechatId,r.whatsappContactQr,r.wechatQrUrl,r.isActive?"Active":"Inactive"];
+var r=sample()[0],a=[r.firstName,r.lastName,r.phoneNumber,r.mobile,r.email,r.website,r.company,r.jobTitle,r.fax,r.address,r.city,r.postCode,r.country,r.wechatId,r.whatsappCountryCode,r.whatsappPhoneNumber,r.whatsappMessage,r.wechatQrUrl,r.isActive?"Active":"Inactive"];
 return CSVH.join(",")+"\r\n"+a.map(csvQuote).join(",")+"\r\n"}
 function downloadCsv(){var b=new Blob(["\ufeff"+csvTemplate()],{type:"text/csv;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="contact_qr_import_template.csv";a.click();URL.revokeObjectURL(u)}
 function parseCsv(t){var rows=[],row=[],f="",q=false;for(var i=0;i<t.length;i++){var c=t[i],n=t[i+1];if(q){if(c==='"'&&n==='"'){f+='"';i++}else if(c==='"')q=false;else f+=c}else{if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"){row.push(f);rows.push(row);row=[];f=""}else if(c!=="\r")f+=c}}if(f||row.length){row.push(f);rows.push(row)}return rows.filter(function(r){return r.some(function(v){return String(v).trim()})})}
@@ -184,17 +231,17 @@ function importCsv(t){
 var rows=parseCsv(t);if(rows.length<2)throw Error("CSV has no data rows.");var h=rows[0].map(norm),added=0;
 for(var i=1;i<rows.length;i++){var o={};h.forEach(function(k,j){o[k]=rows[i][j]||""});function v(){for(var z=0;z<arguments.length;z++){var x=o[norm(arguments[z])];if(x!==undefined)return String(x).trim()}return ""}
 var fn=v("FirstName"),ln=v("LastName");if(!fn&&!ln)continue;var st=v("Status","IsActive")||"Active";
-contacts.push({id:uid(),contactName:(fn+" "+ln).trim()||"Unnamed Contact",firstName:fn,lastName:ln,phoneNumber:v("PhoneNumber"),mobile:v("Mobile"),email:v("Email","E-mail"),website:v("WebsiteURL","Website"),company:v("Company"),jobTitle:v("JobTitle"),fax:v("Fax"),address:v("Address"),city:v("City"),postCode:v("PostCode"),country:v("Country"),wechatId:v("WeChatId"),whatsappContactQr:v("WhatsAppContactQRLink","WhatsApp Contact QR Link","WhatsAppQRLink"),wechatQrUrl:v("WeChatQRCodeUrl"),wechatQrData:"",isActive:["inactive","false","no","0"].indexOf(st.toLowerCase())<0});added++}
+contacts.push({id:uid(),contactName:(fn+" "+ln).trim()||"Unnamed Contact",firstName:fn,lastName:ln,phoneNumber:v("PhoneNumber"),mobile:v("Mobile"),email:v("Email","E-mail"),website:v("WebsiteURL","Website"),company:v("Company"),jobTitle:v("JobTitle"),fax:v("Fax"),address:v("Address"),city:v("City"),postCode:v("PostCode"),country:v("Country"),wechatId:v("WeChatId"),whatsappCountryCode:v("WhatsAppCountryCode","WhatsApp Country Code"),whatsappPhoneNumber:v("WhatsAppPhoneNumber","WhatsApp Phone Number"),whatsappMessage:v("WhatsAppMessage","WhatsApp Message"),wechatQrUrl:v("WeChatQRCodeUrl"),wechatQrData:"",isActive:["inactive","false","no","0"].indexOf(st.toLowerCase())<0});added++}
 if(!added)throw Error("No valid contacts found.");save();page=1;render();return added}
 function bindUpload(input,preview,img,setter){$(input).addEventListener("change",function(e){var f=e.target.files[0];if(!f){setter("");$(preview).classList.add("hidden");return}var rd=new FileReader();rd.onload=function(){setter(rd.result);$(img).src=rd.result;$(preview).classList.remove("hidden")};rd.readAsDataURL(f)})}
-function qrPreview(el){var title=el.getAttribute("data-name")+" - "+el.getAttribute("data-type")+" QR",p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");$("qrTitle").textContent=title;$("qrBig").innerHTML="";if(img){var i=new Image();i.src=img;$("qrBig").appendChild(i)}else if(p)qrcode($("qrBig"),p,320);$("qrNote").textContent=el.getAttribute("data-type")==="V-card"?"Scan with the normal phone camera to add/save the contact.":el.getAttribute("data-type")==="WhatsApp Contact"?"Scan with WhatsApp → New Contact → Add via QR code, then tap Add to Contacts.":"Scan this uploaded WeChat QR in WeChat.";$("qrDialog").showModal()}
+function qrPreview(el){var title=el.getAttribute("data-name")+" - "+el.getAttribute("data-type")+" QR",p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");$("qrTitle").textContent=title;$("qrBig").innerHTML="";if(img){var i=new Image();i.src=img;$("qrBig").appendChild(i)}else if(p)qrcode($("qrBig"),p,320);$("qrNote").textContent=el.getAttribute("data-type")==="V-card"?"Scan with the normal phone camera to add/save the contact.":el.getAttribute("data-type")==="WhatsApp"?"QR.io-style WhatsApp QR: opens WhatsApp for this phone number"+(el.getAttribute("data-payload").indexOf("?text=")>=0?" with the message prefilled.":"."):"Scan this uploaded WeChat QR in WeChat.";$("qrDialog").showModal()}
 contacts=load();render();
-$("addBtn").onclick=openAdd;$("downloadBtn").onclick=downloadCsv;$("resetBtn").onclick=reset;$("closeEdit").onclick=function(){$("editDialog").close()};$("cancel").onclick=function(){$("editDialog").close()};$("closeQr").onclick=function(){$("qrDialog").close()};
+$("addBtn").onclick=openAdd;$("downloadBtn").onclick=downloadCsv;$("downloadAllQrBtn").onclick=downloadAllQrs;$("resetBtn").onclick=reset;$("closeEdit").onclick=function(){$("editDialog").close()};$("cancel").onclick=function(){$("editDialog").close()};$("closeQr").onclick=function(){$("qrDialog").close()};
 $("search").oninput=function(){page=1;render()};$("status").onchange=function(){page=1;render()};$("prev").onclick=function(){if(page>1){page--;render()}};$("next").onclick=function(){page++;render()};
 document.querySelector("thead").addEventListener("click",function(e){var th=e.target.closest("th.sort");if(!th)return;var k=th.getAttribute("data-k");if(sortKey===k)sortDir=sortDir==="asc"?"desc":"asc";else{sortKey=k;sortDir="asc"}page=1;render()});
-$("tbody").addEventListener("click",function(e){var q=e.target.closest(".qr");if(q){qrPreview(q);return}var b=e.target.closest("[data-a]");if(!b)return;var a=b.getAttribute("data-a"),id=b.getAttribute("data-id");if(a==="edit")openEdit(id);else if(a==="remove")remove(id);else if(a==="vcf")downloadVcf(id)});
+$("tbody").addEventListener("click",function(e){var q=e.target.closest(".qr");if(q){qrPreview(q);return}var b=e.target.closest("[data-a]");if(!b)return;var a=b.getAttribute("data-a"),id=b.getAttribute("data-id");if(a==="downloadqr")downloadContactQrs(id);else if(a==="edit")openEdit(id);else if(a==="remove")remove(id);else if(a==="vcf")downloadVcf(id)});
 bindUpload("wechatQrFile","wcPreview","wcImg",function(v){pendingWc=v});
-$("form").addEventListener("submit",function(e){e.preventDefault();var fn=$("firstName").value.trim(),ln=$("lastName").value.trim(),mob=$("mobile").value.trim();if(!fn||!ln){msg("First name and Last name are required.",true);return}if(!mob){msg("Mobile is required.",true);return}var id=$("id").value,old=id?contacts.find(function(x){return x.id===id}):null,r={id:id||uid(),contactName:fn+" "+ln,firstName:fn,lastName:ln,phoneNumber:$("phoneNumber").value.trim(),mobile:mob,email:$("email").value.trim(),website:$("website").value.trim(),company:$("company").value.trim(),jobTitle:$("jobTitle").value.trim(),fax:$("fax").value.trim(),address:$("address").value.trim(),city:$("city").value.trim(),postCode:$("postCode").value.trim(),country:$("country").value.trim(),wechatId:$("wechatId").value.trim(),whatsappContactQr:$("whatsappContactQr").value.trim(),wechatQrUrl:$("wechatQrUrl").value.trim(),wechatQrData:pendingWc||(old?old.wechatQrData:""),isActive:$("isActive").value==="true"};if(id){var n=contacts.findIndex(function(x){return x.id===id});if(n>=0)contacts[n]=r}else contacts.push(r);save();render();$("editDialog").close();msg(id?"Contact updated.":"Contact added.")});
+$("form").addEventListener("submit",function(e){e.preventDefault();var fn=$("firstName").value.trim(),ln=$("lastName").value.trim(),mob=$("mobile").value.trim();if(!fn||!ln){msg("First name and Last name are required.",true);return}if(!mob){msg("Mobile is required.",true);return}var id=$("id").value,old=id?contacts.find(function(x){return x.id===id}):null,r={id:id||uid(),contactName:fn+" "+ln,firstName:fn,lastName:ln,phoneNumber:$("phoneNumber").value.trim(),mobile:mob,email:$("email").value.trim(),website:$("website").value.trim(),company:$("company").value.trim(),jobTitle:$("jobTitle").value.trim(),fax:$("fax").value.trim(),address:$("address").value.trim(),city:$("city").value.trim(),postCode:$("postCode").value.trim(),country:$("country").value.trim(),wechatId:$("wechatId").value.trim(),whatsappCountryCode:$("whatsappCountryCode").value.trim(),whatsappPhoneNumber:$("whatsappPhoneNumber").value.trim(),whatsappMessage:$("whatsappMessage").value.trim(),wechatQrUrl:$("wechatQrUrl").value.trim(),wechatQrData:pendingWc||(old?old.wechatQrData:""),isActive:$("isActive").value==="true"};if(id){var n=contacts.findIndex(function(x){return x.id===id});if(n>=0)contacts[n]=r}else contacts.push(r);save();render();$("editDialog").close();msg(id?"Contact updated.":"Contact added.")});
 $("csvFile").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{msg(importCsv(rd.result)+" contact(s) imported.")}catch(x){msg("CSV import failed: "+x.message,true)}e.target.value=""};rd.readAsText(f)});
 })();
 </script>
