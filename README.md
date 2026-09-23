@@ -2,38 +2,34 @@
 
 Standalone test site for managing contact QR codes.
 
-## Features
-- Search, sorting, status filter and pagination
-- Add / Edit / Remove contacts
-- CSV import and matching CSV template download
-- WhatsApp Add Contact QR generated from Mobile
-- WeChat QR image support
-- Full V-card QR with .VCF download
-- Click any QR to open a large testing preview
-- Fully populated built-in contact data
-- Missing required QR values display **N/A**
-- Browser localStorage persistence and Reset Test Data
-
 ## QR rules
 
 ### WhatsApp QR
-- If **Mobile** has a value, the site automatically generates a minimal vCard QR using:
-  - First name
-  - Last name
-  - Mobile
-- Scan it using the normal iPhone / Android camera to add/save the contact.
-- If Mobile is blank, WhatsApp QR displays **N/A**.
-- An uploaded WhatsApp QR image or image URL can optionally override the generated QR.
+- The WhatsApp QR column only displays an **official WhatsApp QR image** or image URL.
+- A mobile number by itself is **not enough** to generate a QR that WhatsApp's dedicated **Add via QR code** scanner accepts.
+- Get the official QR in WhatsApp:
+  1. Open WhatsApp.
+  2. Open Settings / your profile.
+  3. Tap the QR icon next to your name.
+  4. Open **My Code**.
+  5. Save/share the QR image.
+  6. Upload it in this site or provide the image URL.
+- If neither image nor URL is supplied, WhatsApp QR displays **N/A**.
 
 ### WeChat QR
-- WeChat ID by itself does **not** generate a QR.
-- WeChat QR is displayed only when:
-  - `WeChatQRCodeUrl` has a value, or
-  - a WeChat QR image is uploaded manually.
-- If neither is provided, WeChat QR displays **N/A**.
+- WeChat ID alone does **not** generate a QR.
+- WeChat QR is displayed only when a WeChat QR image or image URL is provided.
+- Otherwise WeChat QR displays **N/A**.
 
 ### V-card QR
-The V-card QR is generated from the available contact/company/location fields and is intended for normal phone-camera contact import.
+- V-card QR is generated from the contact form data.
+- Use this QR with the normal iPhone / Android camera to add/save the contact.
+- It is separate from WhatsApp's proprietary Add-via-QR format.
 
-## Run
-Open `index.html` in a browser. The page uses QRCode.js from cdnjs for generated QR codes.
+## Other features
+- Search, sorting, status filter and pagination
+- Add / Edit / Remove contacts
+- CSV import and matching CSV template
+- QR click-to-enlarge preview
+- .VCF download
+- Reset Test Data
