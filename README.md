@@ -5,26 +5,22 @@ Standalone test site for managing contact QR codes.
 ## QR rules
 
 ### WhatsApp QR
-- The WhatsApp QR column only displays an **official WhatsApp QR image** or image URL.
-- A mobile number by itself is **not enough** to generate a QR that WhatsApp's dedicated **Add via QR code** scanner accepts.
-- Get the official QR in WhatsApp:
-  1. Open WhatsApp.
-  2. Open Settings / your profile.
-  3. Tap the QR icon next to your name.
-  4. Open **My Code**.
-  5. Save/share the QR image.
-  6. Upload it in this site or provide the image URL.
-- If neither image nor URL is supplied, WhatsApp QR displays **N/A**.
+- WhatsApp QR is generated automatically from **Mobile**.
+- The generated QR contains a plain WhatsApp link: `https://wa.me/<mobile>`.
+- It does **not** contain a prefilled message.
+- Scan it using the **WhatsApp Camera**.
+- WhatsApp's documented flow is: **WhatsApp link → Open link → Add to Contacts**.
+- If Mobile is blank, WhatsApp QR displays **N/A**.
+- Do **not** use **New Contact → Add via QR code** for this generated link QR; that screen expects WhatsApp's proprietary contact QR.
 
 ### WeChat QR
 - WeChat ID alone does **not** generate a QR.
-- WeChat QR is displayed only when a WeChat QR image or image URL is provided.
+- WeChat QR is displayed only when a WeChat QR image or `WeChatQRCodeUrl` is provided.
 - Otherwise WeChat QR displays **N/A**.
 
 ### V-card QR
 - V-card QR is generated from the contact form data.
-- Use this QR with the normal iPhone / Android camera to add/save the contact.
-- It is separate from WhatsApp's proprietary Add-via-QR format.
+- Scan with the normal iPhone / Android camera to create/save the contact.
 
 ## Other features
 - Search, sorting, status filter and pagination
