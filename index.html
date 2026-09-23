@@ -1366,15 +1366,6 @@ function qrSvg(text,size=80){
   }catch(e){return '<span class="muted">QR error</span>';}
 }
 
-const KEY='contactQrTestSite_v2';
-const PAGE_SIZE=8;
-const sampleData=[
-  {id:'sg-sales',contactName:'Singapore Sales',country:'Singapore',countryCode:'+65',phoneNumber:'91234567',wechatId:'superworld_sg',platform:'Both',whatsappQrUrl:'',whatsappQrData:'',wechatQrUrl:'',wechatQrData:'',defaultMessage:'Hi, I would like to enquire about your products.',isActive:true},
-  {id:'cn-sales',contactName:'China Sales',country:'China',countryCode:'+86',phoneNumber:'13800138000',wechatId:'superworld_cn',platform:'Both',whatsappQrUrl:'',whatsappQrData:'',wechatQrUrl:'',wechatQrData:'',defaultMessage:'Hello, I would like more information.',isActive:true},
-  {id:'my-sales',contactName:'Malaysia Sales',country:'Malaysia',countryCode:'+60',phoneNumber:'123456789',wechatId:'superworld_my',platform:'Both',whatsappQrUrl:'',whatsappQrData:'',wechatQrUrl:'',wechatQrData:'',defaultMessage:'Hi, please send me more details.',isActive:true}
-];
-let contacts=load(); let currentPage=1; let pendingWaImageData=''; let pendingWechatImageData=''; let sortKey='contactName'; let sortDir='asc';
-const $=id=>document.getElementById(id);
 var KEY="contactQrManagement_v20",PAGE=10,contacts=[],page=1,sortKey="contactName",sortDir="asc",pendingWc="";
 function $(id){return document.getElementById(id)}
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
