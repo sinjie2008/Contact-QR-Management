@@ -1529,6 +1529,9 @@ contacts.push({id:uid(),contactName:(fn+" "+ln).trim()||"Unnamed Contact",firstN
 if(!added)throw Error("No valid contacts found.");save();page=1;render();return added}
 function bindUpload(input,preview,img,setter){$(input).addEventListener("change",function(e){var f=e.target.files[0];if(!f){setter("");$(preview).classList.add("hidden");return}var rd=new FileReader();rd.onload=function(){setter(rd.result);$(img).src=rd.result;$(preview).classList.remove("hidden")};rd.readAsDataURL(f)})}
 function qrPreview(el){var title=el.getAttribute("data-name")+" - "+el.getAttribute("data-type")+" QR",p=el.getAttribute("data-payload"),img=el.getAttribute("data-img");$("qrTitle").textContent=title;$("qrBig").innerHTML="";if(img){var i=new Image();i.src=img;$("qrBig").appendChild(i)}else if(p)qrcode($("qrBig"),p,320);$("qrNote").textContent=el.getAttribute("data-type")==="V-card"?"Scan with the normal phone camera to add/save the contact.":el.getAttribute("data-type")==="WhatsApp Link"?"WhatsApp QR restored from the provided v5. Scan with your normal phone camera or WhatsApp camera.":"Scan this uploaded WeChat QR in WeChat.";$("qrDialog").showModal()}
+function initProtectedApp(){
+if(window.__contactQrAppInitialized)return;
+window.__contactQrAppInitialized=true;
 contacts=load();render();
 $("addBtn").onclick=openAdd;$("downloadBtn").onclick=downloadCsv;$("downloadAllQrBtn").onclick=downloadAllQrs;$("resetBtn").onclick=reset;$("closeEdit").onclick=function(){$("editDialog").close()};$("cancel").onclick=function(){$("editDialog").close()};$("closeQr").onclick=function(){$("qrDialog").close()};
 $("search").oninput=function(){page=1;render()};$("status").onchange=function(){page=1;render()};$("prev").onclick=function(){if(page>1){page--;render()}};$("next").onclick=function(){page++;render()};
@@ -1537,6 +1540,13 @@ $("tbody").addEventListener("click",function(e){var q=e.target.closest(".qr");if
 bindUpload("wechatQrFile","wcPreview","wcImg",function(v){pendingWc=v});
 $("form").addEventListener("submit",function(e){e.preventDefault();var fn=$("firstName").value.trim(),ln=$("lastName").value.trim(),mob=$("mobile").value.trim();if(!fn||!ln){msg("First name and Last name are required.",true);return}if(!mob){msg("Mobile is required.",true);return}var id=$("id").value,old=id?contacts.find(function(x){return x.id===id}):null,r={id:id||uid(),contactName:fn+" "+ln,firstName:fn,lastName:ln,phoneNumber:$("phoneNumber").value.trim(),mobile:mob,email:$("email").value.trim(),website:$("website").value.trim(),company:$("company").value.trim(),jobTitle:$("jobTitle").value.trim(),fax:$("fax").value.trim(),address:$("address").value.trim(),city:$("city").value.trim(),postCode:$("postCode").value.trim(),country:$("country").value.trim(),wechatId:$("wechatId").value.trim(),whatsappMessage:$("whatsappMessage").value.trim(),wechatQrUrl:$("wechatQrUrl").value.trim(),wechatQrData:pendingWc||(old?old.wechatQrData:""),isActive:$("isActive").value==="true"};if(id){var n=contacts.findIndex(function(x){return x.id===id});if(n>=0)contacts[n]=r}else contacts.push(r);save();render();$("editDialog").close();msg(id?"Contact updated.":"Contact added.")});
 $("csvFile").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){try{msg(importCsv(rd.result)+" contact(s) imported.")}catch(x){msg("CSV import failed: "+x.message,true)}e.target.value=""};rd.readAsText(f)});
+
+}
+if(sessionStorage.getItem("contactQrAuth_v1")==="unlocked"){
+initProtectedApp();
+}else{
+window.addEventListener("contactQrUnlocked",initProtectedApp,{once:true});
+}
 })();
 </script>
 </body>
