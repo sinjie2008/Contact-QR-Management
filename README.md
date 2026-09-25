@@ -58,3 +58,11 @@ This repository is a public static website. The password gate helps prevent norm
 - The Profile QR is regenerated every time the contact row is rendered, so editing and saving a contact creates a new QR payload with the latest data.
 - The existing **V-card QR** remains available for saving contact details; it does not support a custom background image.
 - Use public HTTPS image URLs for images that must appear after scanning on another phone. Browser-uploaded data URLs are kept local to the management browser and are intentionally not placed into the QR because they can make the QR payload too large.
+
+## Android Contact Photo
+
+- Android contact photos are now handled through **Profile QR → Add to Android Contacts**.
+- The public profile page downloads the Profile Image URL, converts it to vCard PHOTO data, and embeds the photo in the downloaded VCF whenever possible.
+- If the original image host blocks cross-origin downloads, the page falls back to the public wsrv.nl image-resize/cache service to create a small contact photo for the VCF.
+- The direct V-card QR also includes a `PHOTO;VALUE=URI` field, but Android contact apps vary in whether they fetch remote photo URIs. The Profile QR download path is therefore the recommended Android flow.
+- Android/Google Contacts does not have a standard vCard field for a custom profile background/calling-card background. The Profile Background Image remains visible on the digital profile page, while the profile photo is imported into Contacts.
