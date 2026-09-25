@@ -97,6 +97,7 @@
 
   function unlock(gate) {
     sessionStorage.setItem(SESSION_KEY, "unlocked");
+    window.dispatchEvent(new Event("contactQrUnlocked"));
     sessionStorage.removeItem(ATTEMPT_KEY);
     sessionStorage.removeItem(LOCK_KEY);
     setLockedState(false);
