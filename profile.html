@@ -14,6 +14,7 @@
 h1{font-size:28px;margin:14px 0 4px;line-height:1.15}.role{font-size:15px;font-weight:700;color:#344054}.company{margin-top:4px;color:var(--muted);font-size:14px}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:22px}.action{display:flex;align-items:center;justify-content:center;gap:7px;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:#344054;background:#fff;font-weight:750;font-size:13px}.action.primary{background:var(--blue);border-color:var(--blue);color:#fff}.action.hidden{display:none}
 .details{margin-top:20px;border-top:1px solid var(--line);padding-top:8px}.row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f0f2f5}.k{width:82px;flex:0 0 82px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}.v{font-size:14px;word-break:break-word}.v a{color:#175cd3;text-decoration:none}
+.wechat-qr{display:block;max-width:180px;max-height:180px;margin-top:8px;border:1px solid var(--line);border-radius:8px}
 .bad{width:min(520px,100%);margin:60px auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:0 16px 50px rgba(16,24,40,.1)}.bad h1{font-size:22px;margin-top:0}
 @media(max-width:420px){body{padding:0}.shell{width:100%}.card{border-radius:0;min-height:100vh;border:0}.cover{height:175px}.content{padding-left:18px;padding-right:18px}.actions{grid-template-columns:1fr 1fr}}
 </style>
@@ -39,16 +40,35 @@ async function contactPhoto(p){
    var res=await fetch(urls[i],{mode:"cors",cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);
    var blob=await res.blob();if(!/^image\//i.test(blob.type))throw new Error("Not an image");
    var bytes=new Uint8Array(await blob.arrayBuffer());if(!bytes.length)throw new Error("Empty image");
-   var type=/png/i.test(blob.type)?"PNG":"JPEG";
+   var type=/png/i.test(blob.type)?"PNG":/jpe?g/i.test(blob.type)?"JPEG":/gif/i.test(blob.type)?"GIF":"";
+   if(!type)throw new Error("Unsupported image format");
    return {base64:bytesBase64(bytes),type:type};
   }catch(e){}
  }
  return {uri:src};
 }
-function vcard(p,photo){var first=p.firstName||"",last=p.lastName||"",full=p.name||((first+" "+last).trim())||"Contact",L=["BEGIN:VCARD","VERSION:3.0","N:"+vEsc(last)+";"+vEsc(first)+";;;","FN:"+vEsc(full)];if(photo&&photo.base64)L.push(foldVcardLine("PHOTO;ENCODING=b;TYPE="+(photo.type||"JPEG")+":"+photo.base64));else if(photo&&photo.uri)L.push("PHOTO;VALUE=URI:"+photo.uri);if(p.phone)L.push("TEL;TYPE=WORK,VOICE:+"+digits(p.phone));if(p.mobile)L.push("TEL;TYPE=CELL:+"+digits(p.mobile));if(p.email)L.push("EMAIL;TYPE=INTERNET:"+vEsc(p.email));if(p.website)L.push("URL:"+vEsc(p.website));if(p.company)L.push("ORG:"+vEsc(p.company));if(p.jobTitle)L.push("TITLE:"+vEsc(p.jobTitle));if(p.address||p.city||p.postCode||p.country)L.push("ADR;TYPE=WORK:;;"+vEsc(p.address)+";"+vEsc(p.city)+";;"+vEsc(p.postCode)+";"+vEsc(p.country));L.push("END:VCARD");return L.join("\r\n")}
+function vcard(p,photo){
+ var first=p.firstName||"",last=p.lastName||"",full=p.name||((first+" "+last).trim())||"Contact";
+ var L=["BEGIN:VCARD","VERSION:3.0","N:"+vEsc(last)+";"+vEsc(first)+";;;","FN:"+vEsc(full)];
+ if(photo&&photo.base64)L.push(foldVcardLine("PHOTO;ENCODING=b;TYPE="+(photo.type||"JPEG")+":"+photo.base64));
+ else if(photo&&photo.uri)L.push("PHOTO;VALUE=URI:"+photo.uri);
+ if(digits(p.phone))L.push("TEL;TYPE=WORK,VOICE:+"+digits(p.phone));
+ if(digits(p.mobile))L.push("TEL;TYPE=CELL:+"+digits(p.mobile));
+ if(digits(p.fax))L.push("TEL;TYPE=WORK,FAX:+"+digits(p.fax));
+ if(p.email)L.push("EMAIL;TYPE=INTERNET:"+vEsc(p.email));
+ if(safeHttp(p.website||""))L.push("URL:"+vEsc(safeHttp(p.website)));
+ if(p.company)L.push("ORG:"+vEsc(p.company));
+ if(p.jobTitle)L.push("TITLE:"+vEsc(p.jobTitle));
+ if(p.address||p.city||p.postCode||p.country)L.push("ADR;TYPE=WORK:;;"+vEsc(p.address)+";"+vEsc(p.city)+";;"+vEsc(p.postCode)+";"+vEsc(p.country));
+ var notes=[];if(p.wechatId)notes.push("WeChat ID: "+p.wechatId);
+ if(p.whatsappMessage)notes.push("WhatsApp message: "+p.whatsappMessage);
+ if(safeHttp(p.wechatQr||""))notes.push("WeChat QR: "+safeHttp(p.wechatQr));
+ if(notes.length)L.push(foldVcardLine("NOTE:"+vEsc(notes.join("\n"))));
+ L.push("END:VCARD");return L.join("\r\n");
+}
 async function saveContact(p){
  var btn=document.getElementById("saveContact"),status=document.getElementById("saveStatus"),old=btn.textContent;
- btn.disabled=true;btn.textContent="Preparing contact photo...";if(status)status.textContent="Downloading and embedding the profile image for Android Contacts.";
+ btn.disabled=true;btn.textContent="Preparing VCF...";if(status)status.textContent="Fetching the profile photo for the contact file.";
  try{
   var photo=await contactPhoto(p),card=vcard(p,photo),b=new Blob([card],{type:"text/vcard;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");
   a.href=u;a.download=(p.name||"contact").replace(/[^A-Za-z0-9._-]+/g,"_")+".vcf";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1500);
@@ -57,17 +77,18 @@ async function saveContact(p){
  finally{btn.disabled=false;btn.textContent=old}
 }
 function detail(label,value,href){if(!value)return "";var vv=href?'<a href="'+esc(href)+'">'+esc(value)+'</a>':esc(value);return '<div class="row"><div class="k">'+esc(label)+'</div><div class="v">'+vv+'</div></div>'}
+function wechatQrDetail(url){url=safeHttp(url||"");return url?'<div class="row"><div class="k">WeChat QR</div><div class="v"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Open QR image</a><img class="wechat-qr" src="'+esc(url)+'" alt="WeChat QR code" loading="lazy" referrerpolicy="no-referrer"></div></div>':""}
 try{
  var raw=(location.hash.match(/(?:^#|&)p=([^&]+)/)||[])[1];if(!raw)throw new Error("Missing profile data.");
- var p=JSON.parse(decodeBase64Url(raw)),phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeHttp(p.profileImage||""),bg=safeHttp(p.profileBackground||""),piDisplay=proxiedImage(pi,360,360,"cover")||pi,bgDisplay=proxiedImage(bg,1200,500,"cover")||bg;
- var phoneHref=phone?"tel:+"+digits(phone):"",emailHref=p.email?"mailto:"+encodeURIComponent(p.email):"",waHref=wa?"https://wa.me/"+wa:"";
- var address=[p.address,p.city,p.postCode,p.country].filter(Boolean).join(", ");
+ var p=JSON.parse(decodeBase64Url(raw));if(!p||typeof p!=="object"||Array.isArray(p))throw new Error("Invalid profile data.");
+ var phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeHttp(p.profileImage||""),bg=safeHttp(p.profileBackground||""),piDisplay=proxiedImage(pi,360,360,"cover")||pi,bgDisplay=proxiedImage(bg,1200,500,"cover")||bg;
+ var phoneHref=digits(phone)?"tel:+"+digits(phone):"",emailHref=p.email?"mailto:"+encodeURIComponent(p.email):"",waHref=wa?"https://wa.me/"+wa+(p.whatsappMessage?"?text="+encodeURIComponent(p.whatsappMessage):""):"";
  document.title=(p.name||"Contact")+" - Profile";
- document.getElementById("app").innerHTML='<div class="shell"><main class="card"><div class="cover">'+(bgDisplay?'<img id="coverImg" src="'+esc(bgDisplay)+'" data-original="'+esc(bg)+'" alt="">':"")+'</div><div class="content"><div class="avatar-wrap">'+(piDisplay?'<img id="avatarImg" class="avatar" src="'+esc(piDisplay)+'" data-original="'+esc(pi)+'" alt="'+esc(p.name||"Profile")+'">':'<div class="avatar-fallback">'+esc(initials(p))+'</div>')+'</div><h1>'+esc(p.name||"Contact")+'</h1><div class="role">'+esc(p.jobTitle||"")+'</div><div class="company">'+esc(p.company||"")+'</div><div class="actions"><a class="action primary '+(!phoneHref?"hidden":"")+'" href="'+esc(phoneHref)+'">Call</a><a class="action '+(!waHref?"hidden":"")+'" href="'+esc(waHref)+'" target="_blank" rel="noopener">WhatsApp</a><a class="action '+(!emailHref?"hidden":"")+'" href="'+esc(emailHref)+'">Email</a><a class="action '+(!web?"hidden":"")+'" href="'+esc(web)+'" target="_blank" rel="noopener">Website</a><button id="saveContact" class="action primary" style="grid-column:1/-1;cursor:pointer">Add to Android Contacts</button><div id="saveStatus" class="company" style="grid-column:1/-1;text-align:center;margin-top:0">The downloaded VCF will include your profile photo when the image URL is reachable.</div></div><div class="details">'+detail("Mobile",p.mobile,phoneHref)+detail("Phone",p.phone,p.phone?"tel:+"+digits(p.phone):"")+detail("Email",p.email,emailHref)+detail("Website",p.website,web)+detail("WeChat",p.wechatId,"")+detail("Address",address,"")+'</div></div></main></div>';
+ document.getElementById("app").innerHTML='<div class="shell"><main class="card"><div class="cover">'+(bgDisplay?'<img id="coverImg" src="'+esc(bgDisplay)+'" data-original="'+esc(bg)+'" alt="">':"")+'</div><div class="content"><div class="avatar-wrap">'+(piDisplay?'<img id="avatarImg" class="avatar" src="'+esc(piDisplay)+'" data-original="'+esc(pi)+'" alt="'+esc(p.name||"Profile")+'">':'<div class="avatar-fallback">'+esc(initials(p))+'</div>')+'</div><h1>'+esc(p.name||"Contact")+'</h1><div class="role">'+esc(p.jobTitle||"")+'</div><div class="company">'+esc(p.company||"")+'</div><div class="actions"><a class="action primary '+(!phoneHref?"hidden":"")+'" href="'+esc(phoneHref)+'">Call</a><a class="action '+(!waHref?"hidden":"")+'" href="'+esc(waHref)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a class="action '+(!emailHref?"hidden":"")+'" href="'+esc(emailHref)+'">Email</a><a class="action '+(!web?"hidden":"")+'" href="'+esc(web)+'" target="_blank" rel="noopener noreferrer">Website</a><button id="saveContact" class="action primary" style="grid-column:1/-1;cursor:pointer">Download VCF</button><div id="saveStatus" class="company" style="grid-column:1/-1;text-align:center;margin-top:0">Open the downloaded VCF to save this contact. A reachable profile photo is embedded in the file.</div></div><div class="details">'+detail("First name",p.firstName,"")+detail("Last name",p.lastName,"")+detail("Mobile",p.mobile,phoneHref)+detail("Phone",p.phone,digits(p.phone)?"tel:+"+digits(p.phone):"")+detail("Fax",p.fax,digits(p.fax)?"tel:+"+digits(p.fax):"")+detail("Email",p.email,emailHref)+detail("Website",p.website,web)+detail("Company",p.company,"")+detail("Job title",p.jobTitle,"")+detail("Address",p.address,"")+detail("City",p.city,"")+detail("Post code",p.postCode,"")+detail("Country",p.country,"")+detail("WeChat ID",p.wechatId,"")+detail("WA message",p.whatsappMessage,"")+wechatQrDetail(p.wechatQr)+(typeof p.isActive==="boolean"?detail("Status",p.isActive?"Active":"Inactive",""):"")+'</div></div></main></div>';
  var av=document.getElementById("avatarImg");if(av)av.onerror=function(){var original=this.getAttribute("data-original")||"";if(original&&this.src!==original){this.src=original;this.removeAttribute("data-original")}else this.outerHTML='<div class="avatar-fallback">'+esc(initials(p))+'</div>'};
  var cv=document.getElementById("coverImg");if(cv)cv.onerror=function(){var original=this.getAttribute("data-original")||"";if(original&&this.src!==original){this.src=original;this.removeAttribute("data-original")}else this.remove()};
  document.getElementById("saveContact").onclick=function(){saveContact(p)};
-}catch(e){document.getElementById("app").innerHTML='<div class="bad"><h1>Profile unavailable</h1><p>This QR code does not contain valid profile data. Generate a new Profile QR from Contact QR Management.</p></div>'}
+}catch(e){document.getElementById("app").innerHTML='<div class="bad"><h1>Profile unavailable</h1><p>This link does not contain valid profile data. Generate a new public URL or Contact QR from Contact QR Management.</p></div>'}
 </script>
 </body>
 </html>
