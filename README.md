@@ -41,3 +41,12 @@ The site now requires a password before Contact QR Management is initialized.
 
 This repository is a public static website. The password gate helps prevent normal unauthenticated access, but client-side protection is not equivalent to server-side authentication. Do not store confidential source data directly in this public repository. For stronger protection, use a private repository and a hosting layer with server-side or edge authentication.
 
+
+## Profile Images
+
+- Each contact supports a **Profile Image** and **Profile Background Image**.
+- Both fields accept an image URL or a browser upload.
+- The contact listing shows the profile image and background image directly in the datatable.
+- **Reset Test Data** provides built-in sample profile/background images for immediate testing.
+- CSV import/template now support `ProfileImageURL` and `ProfileBackgroundImageURL`.
+- Browser uploads are stored as data URLs in localStorage, so large images can consume browser storage quickly.
