@@ -26,3 +26,18 @@ The WhatsApp QR now uses **Mobile as the single source of truth**.
 - **Download All QR Codes** downloads available QR codes for all contacts.
 - **Download QR** in each row downloads available QR codes for that contact.
 - Downloaded WhatsApp QR files are also generated from the current Mobile value.
+
+## Password Access
+
+The site now requires a password before Contact QR Management is initialized.
+
+- Password verification uses PBKDF2-SHA256 with 310,000 iterations.
+- The plaintext password is not stored in the repository.
+- Authentication is kept only in `sessionStorage`, so a new browser session requires authentication again.
+- After 5 failed attempts, the current tab is temporarily locked for 30 seconds.
+- Saved contact records remain in the browser's `localStorage` and are not rendered until authentication succeeds.
+
+### Security note
+
+This repository is a public static website. The password gate helps prevent normal unauthenticated access, but client-side protection is not equivalent to server-side authentication. Do not store confidential source data directly in this public repository. For stronger protection, use a private repository and a hosting layer with server-side or edge authentication.
+
