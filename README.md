@@ -50,3 +50,11 @@ This repository is a public static website. The password gate helps prevent norm
 - **Reset Test Data** provides built-in sample profile/background images for immediate testing.
 - CSV import/template now support `ProfileImageURL` and `ProfileBackgroundImageURL`.
 - Browser uploads are stored as data URLs in localStorage, so large images can consume browser storage quickly.
+
+## Profile QR
+
+- The **Profile QR** opens `profile.html`, a public mobile-friendly digital profile page.
+- It shows the latest saved **Profile Image URL** and **Profile Background Image URL**, plus contact details and action buttons.
+- The Profile QR is regenerated every time the contact row is rendered, so editing and saving a contact creates a new QR payload with the latest data.
+- The existing **V-card QR** remains available for saving contact details; it does not support a custom background image.
+- Use public HTTPS image URLs for images that must appear after scanning on another phone. Browser-uploaded data URLs are kept local to the management browser and are intentionally not placed into the QR because they can make the QR payload too large.
