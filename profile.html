@@ -26,13 +26,14 @@ function decodeBase64Url(s){s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function digits(v){return String(v||"").replace(/\D/g,"")}
 function safeHttp(v){try{var u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:""}catch(e){return ""}}
+function proxiedImage(v,w,h,fit){var src=safeHttp(v);if(!src)return "";var u="https://images.weserv.nl/?url="+encodeURIComponent(src)+"&output=jpg&q=85";if(w)u+="&w="+w;if(h)u+="&h="+h;if(fit)u+="&fit="+encodeURIComponent(fit);return u}
 function initials(p){return (((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0))||String(p.name||"P").charAt(0)).toUpperCase()}
 function vEsc(v){return String(v||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function foldVcardLine(s){var out=[];for(var i=0;i<s.length;i+=72)out.push((i?" ":"")+s.slice(i,i+72));return out.join("\r\n")}
 function bytesBase64(bytes){var out="",chunk=0x6000;for(var i=0;i<bytes.length;i+=chunk){var part=bytes.subarray(i,Math.min(bytes.length,i+chunk)),bin="";for(var j=0;j<part.length;j++)bin+=String.fromCharCode(part[j]);out+=btoa(bin)}return out}
 async function contactPhoto(p){
  var src=safeHttp(p.profileImage||"");if(!src)return null;
- var urls=[src,"https://wsrv.nl/?url="+encodeURIComponent(src)+"&w=320&h=320&fit=cover&output=jpg&q=82"];
+ var urls=[proxiedImage(src,320,320,"cover"),src];
  for(var i=0;i<urls.length;i++){
   try{
    var res=await fetch(urls[i],{mode:"cors",cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);
@@ -51,20 +52,20 @@ async function saveContact(p){
  try{
   var photo=await contactPhoto(p),card=vcard(p,photo),b=new Blob([card],{type:"text/vcard;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");
   a.href=u;a.download=(p.name||"contact").replace(/[^A-Za-z0-9._-]+/g,"_")+".vcf";document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},1500);
-  if(status)status.textContent=photo&&photo.base64?"VCF ready with the profile photo embedded. Open the downloaded VCF and save it in Contacts.":"VCF downloaded. The image host blocked embedding, so Android may need to load the photo URL.";
+  if(status)status.textContent=photo&&photo.base64?"VCF ready with the profile photo embedded. Open the downloaded VCF and save it in Contacts.":"VCF downloaded, but the profile image could not be embedded. Check that the image URL opens directly in a private/incognito browser tab.";
  }catch(e){if(status)status.textContent="Unable to create the contact file. Please try again.";throw e}
  finally{btn.disabled=false;btn.textContent=old}
 }
 function detail(label,value,href){if(!value)return "";var vv=href?'<a href="'+esc(href)+'">'+esc(value)+'</a>':esc(value);return '<div class="row"><div class="k">'+esc(label)+'</div><div class="v">'+vv+'</div></div>'}
 try{
  var raw=(location.hash.match(/(?:^#|&)p=([^&]+)/)||[])[1];if(!raw)throw new Error("Missing profile data.");
- var p=JSON.parse(decodeBase64Url(raw)),phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeHttp(p.profileImage||""),bg=safeHttp(p.profileBackground||"");
+ var p=JSON.parse(decodeBase64Url(raw)),phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeHttp(p.profileImage||""),bg=safeHttp(p.profileBackground||""),piDisplay=proxiedImage(pi,360,360,"cover")||pi,bgDisplay=proxiedImage(bg,1200,500,"cover")||bg;
  var phoneHref=phone?"tel:+"+digits(phone):"",emailHref=p.email?"mailto:"+encodeURIComponent(p.email):"",waHref=wa?"https://wa.me/"+wa:"";
  var address=[p.address,p.city,p.postCode,p.country].filter(Boolean).join(", ");
  document.title=(p.name||"Contact")+" - Profile";
- document.getElementById("app").innerHTML='<div class="shell"><main class="card"><div class="cover">'+(bg?'<img id="coverImg" src="'+esc(bg)+'" alt="">':"")+'</div><div class="content"><div class="avatar-wrap">'+(pi?'<img id="avatarImg" class="avatar" src="'+esc(pi)+'" alt="'+esc(p.name||"Profile")+'">':'<div class="avatar-fallback">'+esc(initials(p))+'</div>')+'</div><h1>'+esc(p.name||"Contact")+'</h1><div class="role">'+esc(p.jobTitle||"")+'</div><div class="company">'+esc(p.company||"")+'</div><div class="actions"><a class="action primary '+(!phoneHref?"hidden":"")+'" href="'+esc(phoneHref)+'">Call</a><a class="action '+(!waHref?"hidden":"")+'" href="'+esc(waHref)+'" target="_blank" rel="noopener">WhatsApp</a><a class="action '+(!emailHref?"hidden":"")+'" href="'+esc(emailHref)+'">Email</a><a class="action '+(!web?"hidden":"")+'" href="'+esc(web)+'" target="_blank" rel="noopener">Website</a><button id="saveContact" class="action primary" style="grid-column:1/-1;cursor:pointer">Add to Android Contacts</button><div id="saveStatus" class="company" style="grid-column:1/-1;text-align:center;margin-top:0">The downloaded VCF will include your profile photo when the image URL is reachable.</div></div><div class="details">'+detail("Mobile",p.mobile,phoneHref)+detail("Phone",p.phone,p.phone?"tel:+"+digits(p.phone):"")+detail("Email",p.email,emailHref)+detail("Website",p.website,web)+detail("WeChat",p.wechatId,"")+detail("Address",address,"")+'</div></div></main></div>';
- var av=document.getElementById("avatarImg");if(av)av.onerror=function(){this.outerHTML='<div class="avatar-fallback">'+esc(initials(p))+'</div>'};
- var cv=document.getElementById("coverImg");if(cv)cv.onerror=function(){this.remove()};
+ document.getElementById("app").innerHTML='<div class="shell"><main class="card"><div class="cover">'+(bgDisplay?'<img id="coverImg" src="'+esc(bgDisplay)+'" data-original="'+esc(bg)+'" alt="">':"")+'</div><div class="content"><div class="avatar-wrap">'+(piDisplay?'<img id="avatarImg" class="avatar" src="'+esc(piDisplay)+'" data-original="'+esc(pi)+'" alt="'+esc(p.name||"Profile")+'">':'<div class="avatar-fallback">'+esc(initials(p))+'</div>')+'</div><h1>'+esc(p.name||"Contact")+'</h1><div class="role">'+esc(p.jobTitle||"")+'</div><div class="company">'+esc(p.company||"")+'</div><div class="actions"><a class="action primary '+(!phoneHref?"hidden":"")+'" href="'+esc(phoneHref)+'">Call</a><a class="action '+(!waHref?"hidden":"")+'" href="'+esc(waHref)+'" target="_blank" rel="noopener">WhatsApp</a><a class="action '+(!emailHref?"hidden":"")+'" href="'+esc(emailHref)+'">Email</a><a class="action '+(!web?"hidden":"")+'" href="'+esc(web)+'" target="_blank" rel="noopener">Website</a><button id="saveContact" class="action primary" style="grid-column:1/-1;cursor:pointer">Add to Android Contacts</button><div id="saveStatus" class="company" style="grid-column:1/-1;text-align:center;margin-top:0">The downloaded VCF will include your profile photo when the image URL is reachable.</div></div><div class="details">'+detail("Mobile",p.mobile,phoneHref)+detail("Phone",p.phone,p.phone?"tel:+"+digits(p.phone):"")+detail("Email",p.email,emailHref)+detail("Website",p.website,web)+detail("WeChat",p.wechatId,"")+detail("Address",address,"")+'</div></div></main></div>';
+ var av=document.getElementById("avatarImg");if(av)av.onerror=function(){var original=this.getAttribute("data-original")||"";if(original&&this.src!==original){this.src=original;this.removeAttribute("data-original")}else this.outerHTML='<div class="avatar-fallback">'+esc(initials(p))+'</div>'};
+ var cv=document.getElementById("coverImg");if(cv)cv.onerror=function(){var original=this.getAttribute("data-original")||"";if(original&&this.src!==original){this.src=original;this.removeAttribute("data-original")}else this.remove()};
  document.getElementById("saveContact").onclick=function(){saveContact(p)};
 }catch(e){document.getElementById("app").innerHTML='<div class="bad"><h1>Profile unavailable</h1><p>This QR code does not contain valid profile data. Generate a new Profile QR from Contact QR Management.</p></div>'}
 </script>
