@@ -4,9 +4,9 @@ A static contact manager with CSV import, public profile links, and QR downloads
 
 ## Public profiles and contact QR
 
-- Each datatable row shows a clickable **Public URL** and a **Copy URL** button. The URL opens `profile.html` with the contact's saved details, profile photo, background, and **Download VCF** action.
+- Each datatable row shows a clickable **Public URL**, a **Copy URL** button, and the matching profile QR beside the link. Tap the QR to enlarge it for scanning. The URL opens `profile.html` with the contact's saved details, profile photo, background, and **Download VCF** action.
 - **View Profile** in the Action column opens that same public profile in a popup. The popup includes an **Open in new tab** link.
-- The **Contact QR** encodes the public profile URL. Scan it, review the profile, and download/open the VCF to save the contact. The VCF includes the contact photo as embedded image data when its public image URL can be fetched. A photo URI is used if embedding fails. The custom background appears on the profile page; vCard has no standard background field.
+- The profile QR in the Public URL cell encodes that same link. Scan it, review the profile, and download/open the VCF to save the contact. The VCF includes the contact photo as embedded image data when its public image URL can be fetched. A photo URI is used if embedding fails. The custom background appears on the profile page; vCard has no standard background field.
 - **Download QR** and **Download All QR Codes** include `Contact_Profile_QR.png` instead of a direct vCard QR. Direct QR scanner imports can drop the vCard photo on some phones.
 - The public URL contains a base64url-encoded **snapshot** of the contact in its fragment. It is readable to anyone holding the link, and old links do not update after an edit. Copy a new URL or QR after saving changes. Do not put confidential fields in a public profile.
 - Public HTTPS image URLs are needed for images on another device. Browser-uploaded images stay in the manager's local storage and are not embedded in the URL or QR.
