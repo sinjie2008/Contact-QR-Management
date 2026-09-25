@@ -13,6 +13,14 @@ A static contact manager with CSV import, public profile links, and QR downloads
 
 The public page displays name, phone numbers, fax, email, website, company, role, address, city, post code, country, WeChat ID, WhatsApp message, optional WeChat QR image, and status when provided. The VCF stores standard contact fields and includes WeChat and WhatsApp context in a note.
 
+## Multiple phone, email, website, and address fields
+
+In **Add Contact** or **Edit Contact**, use the **+ Add** and **Remove** buttons for optional phone numbers, email addresses, websites, and full addresses. Each address has its own street, city, post code, and country. The required **Mobile** field stays separate and continues to drive the WhatsApp QR. The first value in each group remains compatible with older saved contacts.
+
+The downloadable CSV template contains `PhoneNumber2`, `Email2`, `WebsiteURL2`, and `Address2`/`City2`/`PostCode2`/`Country2`. Add numbered columns such as `PhoneNumber3`, `Email3`, `WebsiteURL3`, `Address3`, `City3`, `PostCode3`, and `Country3` for further values; import recognizes any higher number. Existing CSV files with only the original columns still import. Reset Test Data includes a contact with multiple values for quick testing.
+
+All saved values appear on the public profile and in both the direct V-card QR and downloaded VCF. More fields make QR payloads longer; if a QR exceeds capacity, the table says **QR too large** and the URL can still be opened directly.
+
 ## QR scan comparison for HR
 
 | Route | What the phone does | Photo and background |
