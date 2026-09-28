@@ -85,13 +85,14 @@ async function UNLOCK(password){
   if(!/^<!doctype html>/i.test(html.trim()))throw new Error("Unable to decrypt application.");
   return html;
 }
+function WITH_DEMO(html){return html.replace(/<\/body>/i,'<script src="./less-dense-demo.js"></'+'script></body>')}
 let failures=0,lockedUntil=0;
 $("secureToggle").addEventListener("click",()=>{const i=$("securePassword"),show=i.type==="password";i.type=show?"text":"password";$("secureToggle").textContent=show?"Hide":"Show";$("secureToggle").setAttribute("aria-label",show?"Hide password":"Show password")});
 $("secureUnlockForm").addEventListener("submit",async e=>{
   e.preventDefault();const now=Date.now(),err=$("secureError"),btn=$("secureSubmit"),input=$("securePassword");
   if(now<lockedUntil){err.textContent="Too many attempts. Try again in "+Math.ceil((lockedUntil-now)/1000)+" seconds.";return}
   err.textContent="";btn.disabled=true;btn.innerHTML='<span class="spinner"></span>Unlocking…';
-  try{const html=await UNLOCK(input.value);input.value="";document.open();document.write(html);document.close()}
+  try{const html=WITH_DEMO(await UNLOCK(input.value));input.value="";document.open();document.write(html);document.close()}
   catch(ex){failures++;if(failures>=5){lockedUntil=Date.now()+30000;failures=0;err.textContent="Too many incorrect attempts. Try again in 30 seconds."}else{err.textContent=ex&&ex.message?ex.message:"Unable to unlock.";input.select()}}
   finally{btn.disabled=false;btn.textContent="Unlock"}
 });
