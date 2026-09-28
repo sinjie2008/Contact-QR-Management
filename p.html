@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Opening Contact Profile</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f7fb;color:#172033;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+.card{width:min(420px,calc(100% - 32px));background:#fff;border:1px solid #dfe4ec;border-radius:16px;padding:24px;box-shadow:0 18px 55px rgba(16,24,40,.12);text-align:center}
+h1{font-size:20px;margin:0 0 8px}.muted{color:#667085;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card"><h1>Opening profile…</h1><div id="status" class="muted">Loading the hosted contact profile.</div></div>
+<script>
+"use strict";
+function b64url(text){
+  var bytes=new TextEncoder().encode(text),bin="",chunk=0x6000;
+  for(var i=0;i<bytes.length;i+=chunk){
+    var part=bytes.subarray(i,Math.min(bytes.length,i+chunk));
+    for(var j=0;j<part.length;j++)bin+=String.fromCharCode(part[j]);
+  }
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+(async function(){
+  var code=(location.hash||"").replace(/^#/,"").trim()||new URLSearchParams(location.search).get("id")||"";
+  code=code.toUpperCase();
+  try{
+    if(!code)throw new Error("Missing profile ID.");
+    var res=await fetch("./profiles.json",{cache:"no-store"});
+    if(!res.ok)throw new Error("Unable to load profile store.");
+    var profiles=await res.json(),profile=profiles[code];
+    if(!profile)throw new Error("Profile not found.");
+    var target=new URL("./profile.html",location.href);
+    target.search="";
+    target.hash="p="+b64url(JSON.stringify(profile));
+    location.replace(target.href);
+  }catch(e){
+    document.querySelector("h1").textContent="Profile unavailable";
+    document.getElementById("status").textContent=e&&e.message?e.message:"Unable to open this profile.";
+  }
+})();
+</script>
+</body>
+</html>
