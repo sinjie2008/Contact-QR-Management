@@ -23,10 +23,11 @@ All saved values appear on the public profile and in both the direct V-card QR a
 
 ## Less Dense QR live updates
 
-- The **Less Dense QR** now uses a stable live profile record instead of the original fixed `profiles.json` demo snapshot. After a contact is saved, the live record is updated and the QR continues to point to the same live record.
-- Browser-uploaded **Profile Image** and **Profile Background Image** files are compressed before live sync so the latest saved images can be displayed when the Less Dense QR is scanned from another phone.
-- Live demo records are stored through `api.jsonstorage.net`. The endpoint is an unguessable public URL used by the QR flow; do not use the demo live store for confidential contact data. The normal password-protected manager remains browser-local.
-- Existing legacy short IDs such as `S1`/ `C1` still fall back to `profiles.json` for old QR codes. Reload the manager after deploying this version and use the newly generated Less Dense QR once; subsequent edits in the same manager browser update that live QR target.
+- **Less Dense QR** now uses ChatGPT Sites persistent storage instead of a third-party JSON service.
+- D1 (`DB`) stores the latest public contact profile data. R2 (`PROFILE_IMAGES`) stores uploaded profile and background images.
+- The QR remains stable as `p.html#<contact-id>`. After **Save**, the manager updates the same stored profile, so another phone scanning the same QR receives the newest saved details and images.
+- Browser-uploaded images are compressed before upload to R2. The public profile receives same-origin image URLs from `/api/profile-image`.
+- This requires the existing ChatGPT Site to be redeployed with the D1 and R2 bindings declared in `.openai/hosting.json`. GitHub source changes alone do not provision Site storage.
 
 ## QR scan comparison for HR
 
