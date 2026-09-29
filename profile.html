@@ -27,7 +27,8 @@ function decodeBase64Url(s){s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");
 function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function digits(v){return String(v||"").replace(/\D/g,"")}
 function safeHttp(v){try{var u=new URL(v);return /^https?:$/.test(u.protocol)?u.href:""}catch(e){return ""}}
-function proxiedImage(v,w,h,fit){var src=safeHttp(v);if(!src)return "";var u="https://images.weserv.nl/?url="+encodeURIComponent(src)+"&output=jpg&q=85";if(w)u+="&w="+w;if(h)u+="&h="+h;if(fit)u+="&fit="+encodeURIComponent(fit);return u}
+function safeImage(v){v=String(v||"");if(/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(v))return v;return safeHttp(v)}
+function proxiedImage(v,w,h,fit){var src=safeImage(v);if(!src)return "";if(/^data:image\//i.test(src))return src;var u="https://images.weserv.nl/?url="+encodeURIComponent(src)+"&output=jpg&q=85";if(w)u+="&w="+w;if(h)u+="&h="+h;if(fit)u+="&fit="+encodeURIComponent(fit);return u}
 function initials(p){return (((p.firstName||"").charAt(0)+(p.lastName||"").charAt(0))||String(p.name||"P").charAt(0)).toUpperCase()}
 function vEsc(v){return String(v||"").replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
 function extraStrings(v){return Array.isArray(v)?v.map(function(x){return String(x||"").trim()}).filter(Boolean):[]}
@@ -35,14 +36,19 @@ function extraAddresses(v){return Array.isArray(v)?v.map(function(x){if(typeof x
 function foldVcardLine(s){var out=[];for(var i=0;i<s.length;i+=72)out.push((i?" ":"")+s.slice(i,i+72));return out.join("\r\n")}
 function bytesBase64(bytes){var out="",chunk=0x6000;for(var i=0;i<bytes.length;i+=chunk){var part=bytes.subarray(i,Math.min(bytes.length,i+chunk)),bin="";for(var j=0;j<part.length;j++)bin+=String.fromCharCode(part[j]);out+=btoa(bin)}return out}
 async function contactPhoto(p){
- var src=safeHttp(p.profileImage||"");if(!src)return null;
+ var src=safeImage(p.profileImage||"");if(!src)return null;
+ if(/^data:image\//i.test(src)){
+  var m=src.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i);
+  if(m)return {base64:m[2].replace(/\s+/g,""),type:/png/i.test(m[1])?"PNG":/jpe?g/i.test(m[1])?"JPEG":/gif/i.test(m[1])?"GIF":"WEBP"};
+  return null;
+ }
  var urls=[proxiedImage(src,320,320,"cover"),src];
  for(var i=0;i<urls.length;i++){
   try{
    var res=await fetch(urls[i],{mode:"cors",cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);
    var blob=await res.blob();if(!/^image\//i.test(blob.type))throw new Error("Not an image");
    var bytes=new Uint8Array(await blob.arrayBuffer());if(!bytes.length)throw new Error("Empty image");
-   var type=/png/i.test(blob.type)?"PNG":/jpe?g/i.test(blob.type)?"JPEG":/gif/i.test(blob.type)?"GIF":"";
+   var type=/png/i.test(blob.type)?"PNG":/jpe?g/i.test(blob.type)?"JPEG":/gif/i.test(blob.type)?"GIF":/webp/i.test(blob.type)?"WEBP":"";
    if(!type)throw new Error("Unsupported image format");
    return {base64:bytesBase64(bytes),type:type};
   }catch(e){}
@@ -87,9 +93,17 @@ function moreDetails(label,values,href){return extraStrings(values).map(function
 function moreAddresses(values){return extraAddresses(values).map(function(a,i){return detail("Address "+(i+2),[a.address,a.city,a.postCode,a.country].filter(Boolean).join(", "),"")}).join("")}
 function wechatQrDetail(url){url=safeHttp(url||"");return url?'<div class="row"><div class="k">WeChat QR</div><div class="v"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Open QR image</a><img class="wechat-qr" src="'+esc(url)+'" alt="WeChat QR code" loading="lazy" referrerpolicy="no-referrer"></div></div>':""}
 try{
- var raw=(location.hash.match(/(?:^#|&)p=([^&]+)/)||[])[1];if(!raw)throw new Error("Missing profile data.");
- var p=JSON.parse(decodeBase64Url(raw));if(!p||typeof p!=="object"||Array.isArray(p))throw new Error("Invalid profile data.");
- var phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeHttp(p.profileImage||""),bg=safeHttp(p.profileBackground||""),piDisplay=proxiedImage(pi,360,360,"cover")||pi,bgDisplay=proxiedImage(bg,1200,500,"cover")||bg;
+ var raw=(location.hash.match(/(?:^#|&)p=([^&]+)/)||[])[1],sessionToken=(location.hash.match(/(?:^#|&)s=([^&]+)/)||[])[1],p=null;
+ if(sessionToken){
+  var sessionKey="contactQrRemoteProfile:"+decodeURIComponent(sessionToken),sessionRaw=sessionStorage.getItem(sessionKey);
+  if(!sessionRaw)throw new Error("Missing live profile data.");
+  p=JSON.parse(sessionRaw);sessionStorage.removeItem(sessionKey);
+ }else{
+  if(!raw)throw new Error("Missing profile data.");
+  p=JSON.parse(decodeBase64Url(raw));
+ }
+ if(!p||typeof p!=="object"||Array.isArray(p))throw new Error("Invalid profile data.");
+ var phone=String(p.mobile||p.phone||"").trim(),wa=digits(p.mobile||""),web=safeHttp(p.website||""),pi=safeImage(p.profileImage||""),bg=safeImage(p.profileBackground||""),piDisplay=proxiedImage(pi,360,360,"cover")||pi,bgDisplay=proxiedImage(bg,1200,500,"cover")||bg;
  var phoneHref=digits(phone)?"tel:+"+digits(phone):"",emailHref=p.email?"mailto:"+encodeURIComponent(p.email):"",waHref=wa?"https://wa.me/"+wa+(p.whatsappMessage?"?text="+encodeURIComponent(p.whatsappMessage):""):"";
  document.title=(p.name||"Contact")+" - Profile";
  document.getElementById("app").innerHTML='<div class="shell"><main class="card"><div class="cover">'+(bgDisplay?'<img id="coverImg" src="'+esc(bgDisplay)+'" data-original="'+esc(bg)+'" alt="">':"")+'</div><div class="content"><div class="avatar-wrap">'+(piDisplay?'<img id="avatarImg" class="avatar" src="'+esc(piDisplay)+'" data-original="'+esc(pi)+'" alt="'+esc(p.name||"Profile")+'">':'<div class="avatar-fallback">'+esc(initials(p))+'</div>')+'</div><h1>'+esc(p.name||"Contact")+'</h1><div class="role">'+esc(p.jobTitle||"")+'</div><div class="company">'+esc(p.company||"")+'</div><div class="actions"><a class="action primary '+(!phoneHref?"hidden":"")+'" href="'+esc(phoneHref)+'">Call</a><a class="action '+(!waHref?"hidden":"")+'" href="'+esc(waHref)+'" target="_blank" rel="noopener noreferrer">WhatsApp</a><a class="action '+(!emailHref?"hidden":"")+'" href="'+esc(emailHref)+'">Email</a><a class="action '+(!web?"hidden":"")+'" href="'+esc(web)+'" target="_blank" rel="noopener noreferrer">Website</a><button id="saveContact" class="action primary" style="grid-column:1/-1;cursor:pointer">Download VCF</button><div id="saveStatus" class="company" style="grid-column:1/-1;text-align:center;margin-top:0">Open the downloaded VCF to save this contact. A reachable profile photo is embedded in the file.</div></div><div class="details">'+detail("First name",p.firstName,"")+detail("Last name",p.lastName,"")+detail("Mobile",p.mobile,phoneHref)+detail("Phone",p.phone,digits(p.phone)?"tel:+"+digits(p.phone):"")+moreDetails("Phone",p.extraPhones,function(value){return digits(value)?"tel:+"+digits(value):""})+detail("Fax",p.fax,digits(p.fax)?"tel:+"+digits(p.fax):"")+detail("Email",p.email,emailHref)+moreDetails("Email",p.extraEmails,function(value){return "mailto:"+encodeURIComponent(value)})+detail("Website",p.website,web)+moreDetails("Website",p.extraWebsites,safeHttp)+detail("Company",p.company,"")+detail("Job title",p.jobTitle,"")+detail("Address",p.address,"")+detail("City",p.city,"")+detail("Post code",p.postCode,"")+detail("Country",p.country,"")+moreAddresses(p.extraAddresses)+detail("WeChat ID",p.wechatId,"")+detail("WA message",p.whatsappMessage,"")+wechatQrDetail(p.wechatQr)+(typeof p.isActive==="boolean"?detail("Status",p.isActive?"Active":"Inactive",""):"")+'</div></div></main></div>';
