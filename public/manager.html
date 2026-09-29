@@ -85,7 +85,7 @@ async function UNLOCK(password){
   if(!/^<!doctype html>/i.test(html.trim()))throw new Error("Unable to decrypt application.");
   return html;
 }
-function WITH_DEMO(html){return html.replace(/<\/body>/i,'<script src="./less-dense-demo.js"></'+'script><script src="./image-refresh-fix.js"></'+'script></body>')}
+function WITH_DEMO(html){return html.replace(/<\/body>/i,'<script src="./less-dense-demo.js"></'+'script><script src="./image-refresh-fix.js"></'+'script><script src="./contact-charts.js"></'+'script></body>')}
 let failures=0,lockedUntil=0;
 $("secureToggle").addEventListener("click",()=>{const i=$("securePassword"),show=i.type==="password";i.type=show?"text":"password";$("secureToggle").textContent=show?"Hide":"Show";$("secureToggle").setAttribute("aria-label",show?"Hide password":"Show password")});
 $("secureUnlockForm").addEventListener("submit",async e=>{
