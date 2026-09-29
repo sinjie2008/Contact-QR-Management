@@ -1,0 +1,16 @@
+{
+  "name": "sinjie2008/contact-qr-management",
+  "description": "Contact QR Management PHP MVC application",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-fileinfo": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  }
+}
