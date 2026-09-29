@@ -21,6 +21,13 @@ The downloadable CSV template contains `PhoneNumber2`, `Email2`, `WebsiteURL2`, 
 
 All saved values appear on the public profile and in both the direct V-card QR and downloaded VCF. More fields make QR payloads longer; if a QR exceeds capacity, the table says **QR too large** and the URL can still be opened directly.
 
+## Less Dense QR live updates
+
+- The **Less Dense QR** now uses a stable live profile record instead of the original fixed `profiles.json` demo snapshot. After a contact is saved, the live record is updated and the QR continues to point to the same live record.
+- Browser-uploaded **Profile Image** and **Profile Background Image** files are compressed before live sync so the latest saved images can be displayed when the Less Dense QR is scanned from another phone.
+- Live demo records are stored through `api.jsonstorage.net`. The endpoint is an unguessable public URL used by the QR flow; do not use the demo live store for confidential contact data. The normal password-protected manager remains browser-local.
+- Existing legacy short IDs such as `S1`/ `C1` still fall back to `profiles.json` for old QR codes. Reload the manager after deploying this version and use the newly generated Less Dense QR once; subsequent edits in the same manager browser update that live QR target.
+
 ## QR scan comparison for HR
 
 | Route | What the phone does | Photo and background |
