@@ -1,26 +1,375 @@
-(function(){"use strict";
-var syncing=false,queued=false,pending={profile:"",background:""},KEY="contactQrLessDenseImagesV4";
-function load(){try{var v=JSON.parse(localStorage.getItem(KEY)||"{}");return v&&typeof v==="object"?v:{}}catch(e){return {}}}
-function save(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){}}
-function urlFor(id){var u=new URL("p.html",location.href);u.search="";u.hash=encodeURIComponent(id);return u.href}
-function qr(u){return "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data="+encodeURIComponent(u)}
-function dec(s){s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";var b=atob(s),x=new Uint8Array(b.length);for(var i=0;i<b.length;i++)x[i]=b.charCodeAt(i);return new TextDecoder().decode(x)}
-function parse(u){try{var x=new URL(u,location.href),m=x.hash.match(/(?:^#|&)p=([^&]+)/);if(!m)return null;var p=JSON.parse(dec(m[1]));return p&&typeof p==="object"&&!Array.isArray(p)?p:null}catch(e){return null}}
-function idOf(row){var e=row.querySelector("[data-id]");return e?String(e.getAttribute("data-id")||""):""}
-function pubIndex(row){for(var i=0;i<row.cells.length;i++){var t=(row.cells[i].textContent||"").toLowerCase();if(t.indexOf("public url")>=0)return i}return -1}
-function pubUrl(cell){var a=cell&&cell.querySelector('a[href*="profile.html"]');return a?String(a.href||""):""}
-function rec(id){try{if(Array.isArray(window.contacts))for(var i=0;i<window.contacts.length;i++)if(window.contacts[i]&&String(window.contacts[i].id||"")===id)return window.contacts[i]}catch(e){}return null}
-function dataImg(r,kind){if(!r)return "";var keys=Object.keys(r),fallback="";for(var i=0;i<keys.length;i++){var k=keys[i],l=k.toLowerCase(),v=r[k];if(typeof v!=="string"||!/^data:image\//i.test(v)||/wechat/.test(l))continue;if(kind==="background"&&/background|cover/.test(l))return v;if(kind==="profile"&&!/background|cover/.test(l)&&/profile|avatar|photo|image/.test(l))return v;if(!fallback)fallback=v}return fallback}
-function read(f){return new Promise(function(ok,no){var r=new FileReader();r.onload=function(){ok(String(r.result||""))};r.onerror=no;r.readAsDataURL(f)})}
-function img(src){return new Promise(function(ok,no){var i=new Image();i.onload=function(){ok(i)};i.onerror=no;i.src=src})}
-async function compress(src,kind){if(!/^data:image\//i.test(src))return src;try{var im=await img(src),mw=kind==="profile"?420:1200,mh=kind==="profile"?420:420,target=kind==="profile"?55000:110000,s=Math.min(1,mw/im.naturalWidth,mh/im.naturalHeight),w=Math.max(1,Math.round(im.naturalWidth*s)),h=Math.max(1,Math.round(im.naturalHeight*s)),c=document.createElement("canvas"),ctx=c.getContext("2d"),q=.82,out=src;for(var p=0;p<16;p++){c.width=w;c.height=h;ctx.clearRect(0,0,w,h);ctx.drawImage(im,0,0,w,h);out=c.toDataURL("image/webp",q);if(!/^data:image\/webp/i.test(out))out=c.toDataURL("image/jpeg",q);if(out.length<=target)return out;if(q>.42)q-=.08;else{w=Math.max(80,Math.round(w*.86));h=Math.max(50,Math.round(h*.86))}}return out}catch(e){return src}}
-function kind(input){var t=[input.id||"",input.name||"",input.getAttribute("aria-label")||"",input.parentElement?input.parentElement.textContent:""].join(" ").toLowerCase();if(/background|cover/.test(t))return"background";if(/profile|avatar|photo/.test(t))return"profile";return""}
-function editId(){var f=document.getElementById("form"),i=f&&f.querySelector("#id,[name=id]");return i?String(i.value||""):""}
-function bindFiles(){document.querySelectorAll('input[type="file"]').forEach(function(input){if(input.dataset.ldv4)return;var k=kind(input);if(!k)return;input.dataset.ldv4="1";input.addEventListener("change",async function(){var f=input.files&&input.files[0];if(!f)return;var d=await compress(await read(f),k);pending[k]=d;var id=editId();if(id){var a=load();a[id]=a[id]||{};a[id][k]=d;save(a)}})})}
-function bindForm(){var f=document.getElementById("form");if(!f||f.dataset.ldsync)return;f.dataset.ldsync="1";f.addEventListener("submit",function(){var id=editId(),a=load();if(id){a[id]=a[id]||{};if(pending.profile)a[id].profile=pending.profile;if(pending.background)a[id].background=pending.background;save(a)}setTimeout(function(){sync();pending={profile:"",background:""}},250)},true)}
-async function imgs(id){var a=load(),s=a[id]||{},r=rec(id),pi=s.profile||dataImg(r,"profile"),bg=s.background||dataImg(r,"background"),changed=false;if(pi&&/^data:image\//i.test(pi)&&!s.profile){pi=await compress(pi,"profile");s.profile=pi;changed=true}if(bg&&/^data:image\//i.test(bg)&&!s.background){bg=await compress(bg,"background");s.background=bg;changed=true}if(changed){a[id]=s;save(a)}return{profile:pi,background:bg}}
-function render(td,id,state,err){var u=urlFor(id);td.innerHTML='<img class="ldqr-img" src="'+qr(u)+'" alt="Less dense profile QR" style="width:78px;height:78px;display:block;margin:auto;border:1px solid #eaecf0;border-radius:7px;padding:4px;background:#fff;cursor:zoom-in"><div class="qractions"><a class="qrbtn" href="'+u+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit">Open Profile</a></div><div class="muted ldqr-state" style="font-size:10px;margin-top:4px;max-width:150px"></div>';var n=td.querySelector(".ldqr-state");n.textContent=state||"";if(err)n.title=err;var im=td.querySelector(".ldqr-img");im.onclick=function(){var d=document.createElement("dialog");d.innerHTML='<div style="padding:18px;text-align:center"><h3>Less Dense QR</h3><img src="'+im.src+'" style="width:min(320px,75vw);max-width:100%"><p class="muted">Same QR · latest saved profile</p><button type="button">Close</button></div>';d.querySelector("button").onclick=function(){d.close()};document.body.appendChild(d);d.addEventListener("close",function(){d.remove()},{once:true});d.showModal()}}
-async function rowSync(row,pi){var id=idOf(row);if(!id)return;var td=row.querySelector(".less-dense-cell");if(!td){td=document.createElement("td");td.className="qrcell less-dense-cell";row.cells[pi].after(td)}var p=parse(pubUrl(row.cells[pi]));if(!p){render(td,id,"Profile data unavailable");return}render(td,id,"Saving latest profile…");try{var ii=await imgs(id),res=await fetch("/api/live-profile?id="+encodeURIComponent(id),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:p,profileImage:ii.profile||"",profileBackground:ii.background||""})}),data={};try{data=await res.json()}catch(e){}if(!res.ok)throw new Error(data.error||("HTTP "+res.status));render(td,id,"Live · latest saved profile")}catch(e){render(td,id,"Storage not ready",e&&e.message?e.message:String(e))}}
-async function sync(){if(syncing){queued=true;return}syncing=true;try{bindFiles();bindForm();var table=document.getElementById("table")||document.querySelector("table");if(!table||!table.tHead||!table.tBodies.length)return;var h=table.tHead.rows[0],pi=pubIndex(h);if(pi<0)return;if(!h.querySelector(".less-dense-head")){var th=document.createElement("th");th.className="less-dense-head";th.textContent="Less Dense QR";th.title="Live QR backed by ChatGPT Sites storage";h.cells[pi].after(th)}var rows=Array.from(table.tBodies[0].rows);for(var i=0;i<rows.length;i++){if(rows[i].cells.length===1&&rows[i].cells[0].hasAttribute("colspan")){rows[i].cells[0].colSpan=h.cells.length;continue}await rowSync(rows[i],pi)}}finally{syncing=false;if(queued){queued=false;setTimeout(sync,80)}}}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",sync,{once:true});else sync();var t=document.getElementById("tbody")||document.body;new MutationObserver(function(){setTimeout(sync,80)}).observe(t,{childList:true});
+(function () {
+  "use strict";
+
+  var syncing = false, queued = false, refreshTimer = 0;
+  var pending = { profile: "", background: "" };
+  var imageKey = "contactQrLessDenseImagesV4";
+  var profilesByRow = new WeakMap();
+  var oldQrColumns = [], originalColumnCount = 0;
+
+  function loadImages() {
+    try {
+      var value = JSON.parse(localStorage.getItem(imageKey) || "{}");
+      return value && typeof value === "object" ? value : {};
+    } catch (e) { return {}; }
+  }
+  function saveImages(value) {
+    try { localStorage.setItem(imageKey, JSON.stringify(value)); } catch (e) {}
+  }
+  function liveUrl(id) {
+    var url = new URL("p.html", location.href);
+    url.search = "";
+    url.hash = encodeURIComponent(id);
+    return url.href;
+  }
+  function qrImage(url) {
+    return "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=" + encodeURIComponent(url);
+  }
+  function snapshot(url) {
+    try {
+      var match = new URL(url, location.href).hash.match(/(?:^#|&)p=([^&]+)/);
+      if (!match) return null;
+      var value = match[1].replace(/-/g, "+").replace(/_/g, "/");
+      while (value.length % 4) value += "=";
+      var bin = atob(value), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var profile = JSON.parse(new TextDecoder().decode(bytes));
+      return profile && typeof profile === "object" && !Array.isArray(profile) ? profile : null;
+    } catch (e) { return null; }
+  }
+  function cleanProfile(profile) {
+    var result = JSON.parse(JSON.stringify(profile));
+    Object.keys(result).forEach(function (key) {
+      if (/^(wechatQr|whatsappQr|vCardQr)/i.test(key)) delete result[key];
+    });
+    return result;
+  }
+  function rowId(row) {
+    var element = row.querySelector("[data-id]");
+    var id = row.getAttribute("data-id") || (element && element.getAttribute("data-id")) || "";
+    return /^[A-Za-z0-9_-]{1,100}$/.test(id) ? id : "";
+  }
+  function publicColumn(header) {
+    for (var i = 0; i < header.cells.length; i++) {
+      if (/public url/i.test(header.cells[i].textContent || "")) return i;
+    }
+    return -1;
+  }
+  function currentRecord(id) {
+    try {
+      if (Array.isArray(window.contacts)) {
+        for (var i = 0; i < window.contacts.length; i++) {
+          if (window.contacts[i] && String(window.contacts[i].id || "") === id) return window.contacts[i];
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+  function dataImage(record, type) {
+    if (!record) return "";
+    var keys = Object.keys(record);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i].toLowerCase(), value = record[keys[i]];
+      if (typeof value !== "string" || !/^data:image\//i.test(value)) continue;
+      if (type === "background" && /background|cover/.test(key)) return value;
+      if (type === "profile" && !/background|cover|wechat/.test(key) && /profile|avatar|photo/.test(key)) return value;
+    }
+    return "";
+  }
+  function readFile(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || "")); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  function loadImage(source) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.onload = function () { resolve(image); };
+      image.onerror = reject;
+      image.src = source;
+    });
+  }
+  async function compress(source, type) {
+    if (!/^data:image\//i.test(source)) return source;
+    try {
+      var image = await loadImage(source);
+      var maxWidth = type === "profile" ? 420 : 1200;
+      var maxHeight = type === "profile" ? 420 : 420;
+      var target = type === "profile" ? 55000 : 110000;
+      var scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+      var width = Math.max(1, Math.round(image.naturalWidth * scale));
+      var height = Math.max(1, Math.round(image.naturalHeight * scale));
+      var canvas = document.createElement("canvas"), context = canvas.getContext("2d");
+      var quality = .82, result = source;
+      for (var i = 0; i < 16; i++) {
+        canvas.width = width;
+        canvas.height = height;
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        result = canvas.toDataURL("image/webp", quality);
+        if (!/^data:image\/webp/i.test(result)) result = canvas.toDataURL("image/jpeg", quality);
+        if (result.length <= target) return result;
+        if (quality > .42) quality -= .08;
+        else {
+          width = Math.max(80, Math.round(width * .86));
+          height = Math.max(50, Math.round(height * .86));
+        }
+      }
+      return result;
+    } catch (e) { return source; }
+  }
+  function imageType(input) {
+    var label = input.id ? document.querySelector('label[for="' + CSS.escape(input.id) + '"]') : null;
+    var nearby = input.closest(".field, .form-field, .full, label");
+    var words = [input.id, input.name, input.getAttribute("aria-label"), label && label.textContent, nearby && nearby.textContent].join(" ").toLowerCase();
+    if (/background|cover/.test(words)) return "background";
+    if (/profile|avatar|photo/.test(words) && !/wechat/.test(words)) return "profile";
+    return "";
+  }
+  function editingId() {
+    var form = document.getElementById("form");
+    var field = form && form.querySelector("#id,[name=id]");
+    return field ? String(field.value || "") : "";
+  }
+  function bindImageInputs() {
+    document.querySelectorAll('input[type="file"]').forEach(function (input) {
+      if (input.dataset.liveImageBound) return;
+      var type = imageType(input);
+      if (!type) return;
+      input.dataset.liveImageBound = "1";
+      input.addEventListener("change", async function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var data = await compress(await readFile(file), type);
+        pending[type] = data;
+        var id = editingId();
+        if (id) {
+          var images = loadImages();
+          images[id] = images[id] || {};
+          images[id][type] = data;
+          saveImages(images);
+        }
+      });
+    });
+  }
+  function bindForm() {
+    var form = document.getElementById("form");
+    if (!form || form.dataset.liveProfileBound) return;
+    form.dataset.liveProfileBound = "1";
+    form.addEventListener("submit", function () {
+      var id = editingId(), images = loadImages();
+      if (id) {
+        images[id] = images[id] || {};
+        if (pending.profile) images[id].profile = pending.profile;
+        if (pending.background) images[id].background = pending.background;
+        saveImages(images);
+      }
+      setTimeout(function () {
+        pending = { profile: "", background: "" };
+        scheduleSync();
+      }, 250);
+    }, true);
+  }
+  async function imagesFor(id) {
+    var images = loadImages(), saved = images[id] || {}, record = currentRecord(id);
+    var profile = saved.profile || dataImage(record, "profile");
+    var background = saved.background || dataImage(record, "background");
+    var changed = false;
+    if (profile && /^data:image\//i.test(profile) && !saved.profile) {
+      profile = await compress(profile, "profile");
+      saved.profile = profile;
+      changed = true;
+    }
+    if (background && /^data:image\//i.test(background) && !saved.background) {
+      background = await compress(background, "background");
+      saved.background = background;
+      changed = true;
+    }
+    if (changed) { images[id] = saved; saveImages(images); }
+    return { profile: profile, background: background };
+  }
+
+  function hideOldQrControls() {
+    var all = document.getElementById("downloadAllQrBtn");
+    if (all) all.remove();
+    var subtitle = document.querySelector(".panel > .sub");
+    if (subtitle && /whatsapp qr|wechat qr|v-?card qr/i.test(subtitle.textContent)) {
+      subtitle.textContent = "Manage contacts and share their live public profiles.";
+    }
+    var notice = document.querySelector(".panel > .notice");
+    if (notice && /whatsapp qr|wechat qr|v-?card qr/i.test(notice.textContent)) {
+      notice.textContent = "Share the Public URL or Less Dense QR. Save a contact to update the same QR with the latest profile and images.";
+    }
+    ["wechatQrUrl", "wechatQrFile"].forEach(function (id) {
+      var field = document.getElementById(id);
+      var container = field && field.closest(".field, .form-field, .full");
+      if (container) container.hidden = true;
+    });
+    document.querySelectorAll("#form .section").forEach(function (section) {
+      var label = section.textContent || "";
+      if (/whatsapp qr/i.test(label)) {
+        var container = section.closest(".full");
+        if (container) container.hidden = true;
+      } else if (/qr settings/i.test(label)) {
+        section.textContent = label.replace(/QR Settings/i, "Profile details");
+      }
+    });
+    var template = document.getElementById("downloadBtn");
+    if (template && !template.dataset.liveTemplateBound) {
+      template.dataset.liveTemplateBound = "1";
+      template.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        var link = document.createElement("a");
+        link.href = "./contact_qr_import_template.csv";
+        link.download = "contact_qr_import_template.csv";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, true);
+    }
+  }
+  function trimOldColumns(table) {
+    var header = table.tHead && table.tHead.rows[0];
+    if (!header) return;
+    var found = [];
+    for (var i = 0; i < header.cells.length; i++) {
+      var label = (header.cells[i].textContent || "").replace(/\s+/g, " ").trim();
+      if (/^(?:WhatsApp|WeChat|V[ -]?card) QR$/i.test(label)) found.push(i);
+    }
+    if (found.length) {
+      oldQrColumns = found;
+      originalColumnCount = header.cells.length;
+      found.slice().reverse().forEach(function (index) { header.cells[index].remove(); });
+    }
+    var count = header.cells.length;
+    Array.from(table.tBodies[0].rows).forEach(function (row) {
+      if (row.cells.length === 1 && row.cells[0].hasAttribute("colspan")) {
+        row.cells[0].colSpan = count;
+        return;
+      }
+      if (!oldQrColumns.length || row.cells.length < originalColumnCount) return;
+      var vcf = row.querySelector('[data-a="vcf"]');
+      var actions = row.querySelector(".actions");
+      if (vcf && actions && !actions.querySelector('[data-a="vcf"]')) {
+        vcf.className = "btn small";
+        vcf.textContent = "Download VCF";
+        actions.appendChild(vcf);
+      }
+      oldQrColumns.slice().reverse().forEach(function (index) {
+        if (row.cells[index]) row.cells[index].remove();
+      });
+    });
+  }
+  function renderCell(cell, id, state, error) {
+    var url = liveUrl(id);
+    cell.classList.add("live-profile-cell");
+    cell.innerHTML = '<div class="live-profile-url"><a class="live-url-link" target="_blank" rel="noopener noreferrer"></a><button class="qrbtn live-copy" type="button">Copy URL</button></div>' +
+      '<div class="live-qr-label">Less Dense QR</div><img class="live-qr-image" alt="Less Dense profile QR" width="88" height="88">' +
+      '<div class="qractions"><a class="qrbtn live-open-profile" target="_blank" rel="noopener noreferrer">Open Profile</a></div>' +
+      '<div class="muted live-qr-state" role="status"></div>';
+    var link = cell.querySelector(".live-url-link");
+    link.href = url;
+    link.textContent = url;
+    cell.querySelector(".live-open-profile").href = url;
+    var image = cell.querySelector(".live-qr-image");
+    image.src = qrImage(url);
+    var status = cell.querySelector(".live-qr-state");
+    status.textContent = state;
+    if (error) status.title = error;
+    cell.querySelector(".live-copy").onclick = async function () {
+      try {
+        await navigator.clipboard.writeText(url);
+        var button = this;
+        button.textContent = "Copied";
+        setTimeout(function () { button.textContent = "Copy URL"; }, 1800);
+      } catch (e) { status.textContent = "Copy failed · select the URL above"; }
+    };
+    image.onclick = function () {
+      var dialog = document.createElement("dialog");
+      dialog.innerHTML = '<div class="live-qr-preview"><h3>Less Dense QR</h3><img alt="Less Dense profile QR" width="320" height="320"><p>Same QR · latest saved profile</p><button type="button">Close</button></div>';
+      dialog.querySelector("img").src = image.src;
+      dialog.querySelector("button").onclick = function () { dialog.close(); };
+      dialog.addEventListener("close", function () { dialog.remove(); }, { once: true });
+      document.body.appendChild(dialog);
+      dialog.showModal();
+    };
+  }
+  async function syncRow(row, index) {
+    var id = rowId(row), cell = row.cells[index];
+    if (!id || !cell) return;
+    var source = cell.querySelector('a[href*="profile.html"]');
+    var profile = source && snapshot(source.href);
+    if (profile) profilesByRow.set(row, profile);
+    else profile = profilesByRow.get(row);
+    if (!profile) { renderCell(cell, id, "Profile data unavailable"); return; }
+    renderCell(cell, id, "Saving latest profile…");
+    try {
+      var images = await imagesFor(id);
+      var response = await fetch("/api/live-profile?id=" + encodeURIComponent(id), {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile: cleanProfile(profile), profileImage: images.profile || "", profileBackground: images.background || "" })
+      });
+      if (!(response.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
+        throw new Error("Live profile API did not return JSON.");
+      }
+      var result = await response.json();
+      if (!response.ok) throw new Error(result.error || ("HTTP " + response.status));
+      renderCell(cell, id, "Live · latest saved profile");
+    } catch (e) {
+      renderCell(cell, id, "Storage not ready", e && e.message ? e.message : String(e));
+    }
+  }
+  async function sync() {
+    if (syncing) { queued = true; return; }
+    syncing = true;
+    try {
+      bindImageInputs();
+      bindForm();
+      hideOldQrControls();
+      var table = document.getElementById("table") || document.querySelector("table");
+      if (!table || !table.tHead || !table.tBodies.length) return;
+      trimOldColumns(table);
+      var header = table.tHead.rows[0], index = publicColumn(header);
+      if (index < 0) return;
+      header.cells[index].textContent = "Public URL + Less Dense QR";
+      var rows = Array.from(table.tBodies[0].rows);
+      for (var i = 0; i < rows.length; i++) {
+        var oldDownload = rows[i].querySelector('[data-a="downloadqr"]');
+        if (oldDownload) oldDownload.remove();
+        await syncRow(rows[i], index);
+      }
+    } finally {
+      syncing = false;
+      if (queued) { queued = false; scheduleSync(); }
+    }
+  }
+  function scheduleSync() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(sync, 80);
+  }
+  function boot() {
+    var style = document.createElement("style");
+    style.textContent = '.live-profile-cell{min-width:190px;max-width:270px;text-align:center}.live-profile-url{display:flex;align-items:center;gap:5px;margin-bottom:8px}.live-url-link{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px}.live-copy{flex:none}.live-qr-label{font-size:13px;font-weight:700;margin-bottom:5px}.live-qr-image{display:block;width:88px;height:88px;margin:auto;padding:4px;border:1px solid #eaecf0;border-radius:7px;background:#fff;cursor:zoom-in}.live-open-profile{display:inline-block;text-decoration:none;color:inherit}.live-qr-state{font-size:12px;line-height:1.35;margin-top:5px}.live-qr-preview{padding:18px;text-align:center}.live-qr-preview img{width:min(320px,75vw);height:auto;max-width:100%}.live-qr-preview p{color:#667085;font-size:13px}#form [hidden]{display:none!important}';
+    document.head.appendChild(style);
+    var table = document.getElementById("table") || document.querySelector("table");
+    if (table && table.tBodies.length) {
+      new MutationObserver(scheduleSync).observe(table.tBodies[0], { childList: true });
+      table.addEventListener("click", function (event) {
+        var button = event.target.closest && event.target.closest("button[data-a]");
+        if (!button || !/view profile/i.test(button.textContent || "")) return;
+        var row = button.closest("tr"), id = row && rowId(row);
+        if (!id) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.open(liveUrl(id), "_blank", "noopener");
+      }, true);
+    }
+    sync();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+  else boot();
 })();

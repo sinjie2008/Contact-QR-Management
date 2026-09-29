@@ -1,50 +1,25 @@
 # Contact QR Management
 
-A static contact manager with CSV import, public profile links, and QR downloads.
+A Vinext ChatGPT Site for managing contacts and sharing their live public profiles.
 
-## Public profiles and contact QR
+## Public URL + Less Dense QR
 
-- Each datatable row shows a clickable **Public URL**, a **Copy URL** button, and the matching profile QR beside the link. Tap the QR to enlarge it for scanning. The URL opens `profile.html` with the contact's saved details, profile photo, background, and **Download VCF** action.
-- **View Profile** in the Action column opens that same public profile in a popup. The popup includes an **Open in new tab** link.
-- The profile QR in the Public URL cell encodes that same link. Scan it, review the profile, and download/open the VCF to save the contact. The VCF includes the contact photo as embedded image data when its public image URL can be fetched. A photo URI is used if embedding fails. The custom background appears on the profile page; vCard has no standard background field.
-- **Download QR** and **Download All QR Codes** include both `Contact_Profile_QR.png` (opens the profile) and `V-card_QR.png` (direct vCard scan), plus available WhatsApp and WeChat codes.
-- The public URL contains a base64url-encoded **snapshot** of the contact in its fragment. It is readable to anyone holding the link, and old links do not update after an edit. Copy a new URL or QR after saving changes. Do not put confidential fields in a public profile.
-- Public HTTPS image URLs are needed for images on another device. Browser-uploaded images stay in the manager's local storage and are not embedded in the URL or QR.
+Each contact row has one stable Public URL and a Less Dense QR. The URL and QR open `p.html#<contact-id>`, which loads the latest saved profile from `/api/live-profile`. **Open Profile** opens that same live URL. After the profile saves to Sites storage, the row reads **Live · latest saved profile**. Tap the QR to enlarge it.
 
-The public page displays name, phone numbers, fax, email, website, company, role, address, city, post code, country, WeChat ID, WhatsApp message, optional WeChat QR image, and status when provided. The VCF stores standard contact fields and includes WeChat and WhatsApp context in a note.
+The manager no longer displays or offers WhatsApp QR, WeChat QR, or direct vCard QR downloads. The public profile still offers **Download VCF** to add the contact to a phone. The profile may also display a WhatsApp contact action and WeChat ID as contact details; these are separate from QR codes.
 
-## Multiple phone, email, website, and address fields
+## Save and image updates
 
-In **Add Contact** or **Edit Contact**, use the **+ Add** and **Remove** buttons for optional phone numbers, email addresses, websites, and full addresses. Each address has its own street, city, post code, and country. The required **Mobile** field stays separate and continues to drive the WhatsApp QR. The first value in each group remains compatible with older saved contacts.
+The password-protected manager lives at `public/manager.html`. Its contact list is held in the manager browser's local storage. A Save updates the same contact ID in D1 (`DB`) and uploads any new Profile Image and Profile Background Image to R2 (`PROFILE_IMAGES`). A later scan of the same Less Dense QR loads the latest profile and images. Image responses use cache busting after updates.
 
-The downloadable CSV template contains `PhoneNumber2`, `Email2`, `WebsiteURL2`, and `Address2`/`City2`/`PostCode2`/`Country2`. Add numbered columns such as `PhoneNumber3`, `Email3`, `WebsiteURL3`, `Address3`, `City3`, `PostCode3`, and `Country3` for further values; import recognizes any higher number. Existing CSV files with only the original columns still import. Reset Test Data includes a contact with multiple values for quick testing.
+The public profile page is available to anyone who has a profile link. Do not enter confidential information into a public profile. The manager's encrypted password gate remains in place.
 
-All saved values appear on the public profile and in both the direct V-card QR and downloaded VCF. More fields make QR payloads longer; if a QR exceeds capacity, the table says **QR too large** and the URL can still be opened directly.
+## Contact fields and CSV
 
-## Less Dense QR live updates
+The manager supports extra phone numbers, email addresses, websites, and addresses. In Add Contact or Edit Contact, use **+ Add** and **Remove** for optional values. The required Mobile field remains separate.
 
-- **Less Dense QR** now uses ChatGPT Sites persistent storage instead of a third-party JSON service.
-- D1 (`DB`) stores the latest public contact profile data. R2 (`PROFILE_IMAGES`) stores uploaded profile and background images.
-- The QR remains stable as `p.html#<contact-id>`. After **Save**, the manager updates the same stored profile, so another phone scanning the same QR receives the newest saved details and images.
-- Browser-uploaded images are compressed before upload to R2. The public profile receives same-origin image URLs from `/api/profile-image`.
-- This requires the existing ChatGPT Site to be redeployed with the D1 and R2 bindings declared in `.openai/hosting.json`. GitHub source changes alone do not provision Site storage.
+The downloadable CSV template includes `PhoneNumber2`, `Email2`, `WebsiteURL2`, and the corresponding second address fields. Higher numbered columns are recognized on import. It includes Profile Image and Profile Background Image URLs, WeChat ID, and WhatsApp message, but no WeChat QR field.
 
-## QR scan comparison for HR
+## Hosting
 
-| Route | What the phone does | Photo and background |
-| --- | --- | --- |
-| **V-card QR** | The QR holds vCard 3.0 text. The phone's scanner may offer to add the contact directly. | It contains only a public `PHOTO;VALUE=URI` reference; some scanners ignore it. No custom background is imported. |
-| **Profile QR + Download VCF** | The QR opens the public profile. Tap **Download VCF**, then open the file in Contacts. | The web page displays photo and background. The VCF attempts to embed a reachable photo; if fetching fails, it falls back to a photo URI. |
-
-QR codes have limited capacity. Long names, messages, or image URLs can make a code too dense or too large; the table then shows **QR too large** and the ZIP omits that code. Phone scanners and Contacts apps vary, so test the direct-scan result on the actual Android and iPhone models used.
-
-## Other QR codes
-
-- WhatsApp QR comes from the current Mobile field and optional default message. Editing Mobile regenerates it. The row offers **Open WhatsApp** and **Save .vcf** for that number.
-- WeChat QR is an image URL or browser upload. WeChat ID alone does not create a QR.
-
-## Data and access
-
-The manager is a static password-gated page whose application payload is encrypted in `index.html`. The plaintext password is not stored in the repository. Contact records live in the manager browser's `localStorage`; there is no server database or server-side contact lookup. The public `profile.html` is accessible without the manager password using a generated link. Client-side protection is not equivalent to server-side authentication.
-
-CSV import and the template support `ProfileImageURL`, `ProfileBackgroundImageURL`, `WeChatId`, `WhatsAppMessage`, `WeChatQRCodeUrl`, and the other contact fields. **Reset Test Data** restores sample contacts in the current browser.
+The root route in `app/page.tsx` redirects to the manager. This is a Vinext Worker build with `/api/live-profile` and `/api/profile-image`, using the bindings declared in `.openai/hosting.json`. It must be deployed as a Worker on the existing Site rather than as static HTML.
