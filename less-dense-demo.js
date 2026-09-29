@@ -229,7 +229,6 @@ async function enrichProfile(profile,id){
   }
   if(pi)profile.profileImage=pi;
   if(bg)profile.profileBackground=bg;
-  profile._lessDenseUpdatedAt=new Date().toISOString();
   return profile;
 }
 function remoteMap(){return loadJson(STORE_KEY,{})}
