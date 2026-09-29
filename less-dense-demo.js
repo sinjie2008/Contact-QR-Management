@@ -215,10 +215,18 @@ function dataImageFromRecord(record,kind){
   }
   return fallback;
 }
-function enrichProfile(profile,id){
+async function enrichProfile(profile,id){
   var images=loadJson(IMAGE_KEY,{}),saved=images[id]||{},record=currentRecord(id);
   var pi=saved.profile||dataImageFromRecord(record,"profile");
   var bg=saved.background||dataImageFromRecord(record,"background");
+  if(pi&&/^data:image\//i.test(pi)&&!saved.profile){
+    pi=await compressImage(pi,"profile");
+    images[id]=images[id]||{};images[id].profile=pi;saveJson(IMAGE_KEY,images);
+  }
+  if(bg&&/^data:image\//i.test(bg)&&!saved.background){
+    bg=await compressImage(bg,"background");
+    images[id]=images[id]||{};images[id].background=bg;saveJson(IMAGE_KEY,images);
+  }
   if(pi)profile.profileImage=pi;
   if(bg)profile.profileBackground=bg;
   profile._lessDenseUpdatedAt=new Date().toISOString();
@@ -259,9 +267,9 @@ async function syncRow(row,publicIndex,force){
     if(row.cells[publicIndex])row.cells[publicIndex].after(td);
   }
   if(!profile){renderCell(td,"","Profile unavailable");return}
-  profile=enrichProfile(profile,id);
+  profile=await enrichProfile(profile,id);
   var signature=JSON.stringify(profile);
-  if(!force&&td.dataset.profileSignature===signature&&td.dataset.remoteUrl){renderCell(td,td.dataset.remoteUrl,"Live · updates after Save");return}
+  if(!force&&td.dataset.profileSignature===signature&&td.dataset.remoteUrl)return
   td.dataset.profileSignature=signature;
   renderCell(td,"","Syncing latest profile…");
   var map=remoteMap(),entry=map[id]||{},uri=entry.uri||"";
