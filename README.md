@@ -2,9 +2,9 @@
 
 A Vinext ChatGPT Site for managing contacts and sharing their live public profiles.
 
-## Public URL + Less Dense QR
+## Public URL + Profile QR
 
-Each contact row has one stable Public URL and a Less Dense QR. The URL and QR open `p.html#<contact-id>`, which loads the latest saved profile from `/api/live-profile`. **Open Profile** opens that same live URL. After the profile saves to Sites storage, the row reads **Live · latest saved profile**. Tap the QR to enlarge it.
+Each contact row has one stable Public URL encoded in a less dense Profile QR. **Open Profile** and **Copy URL** sit side by side beneath it. Both use `p.html#<contact-id>`, which loads the latest saved profile from `/api/live-profile`. After the profile saves to Sites storage, the row reads **Live · latest saved profile**. Tap the QR to enlarge it.
 
 The manager no longer displays or offers WhatsApp QR, WeChat QR, or direct vCard QR downloads. The public profile still offers **Download VCF** to add the contact to a phone. The profile may also display a WhatsApp contact action and WeChat ID as contact details; these are separate from QR codes.
 

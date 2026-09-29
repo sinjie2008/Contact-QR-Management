@@ -197,11 +197,11 @@
     if (all) all.remove();
     var subtitle = document.querySelector(".panel > .sub");
     if (subtitle && /whatsapp qr|wechat qr|v-?card qr/i.test(subtitle.textContent)) {
-      subtitle.textContent = "Manage contacts and share their live public profiles.";
+      subtitle.remove();
     }
     var notice = document.querySelector(".panel > .notice");
     if (notice && /whatsapp qr|wechat qr|v-?card qr/i.test(notice.textContent)) {
-      notice.textContent = "Share the Public URL or Profile QR. Save a contact to update the same QR with the latest profile and images.";
+      notice.remove();
     }
     ["wechatQrUrl", "wechatQrFile"].forEach(function (id) {
       var field = document.getElementById(id);
@@ -267,14 +267,9 @@
   function renderCell(cell, id, state, error) {
     var url = liveUrl(id);
     cell.classList.add("live-profile-cell");
-    cell.innerHTML = '<div class="live-profile-url"><a class="live-url-link" target="_blank" rel="noopener noreferrer"></a></div>' +
-      '<img class="live-qr-image" alt="Profile QR" width="88" height="88">' +
-      '<div class="qractions"><a class="qrbtn live-open-profile" target="_blank" rel="noopener noreferrer">Open Profile</a></div>' +
-      '<div class="muted live-qr-state" role="status"></div>' +
-      '<div class="live-copy-row"><button class="qrbtn live-copy" type="button">Copy URL</button></div>';
-    var link = cell.querySelector(".live-url-link");
-    link.href = url;
-    link.textContent = url;
+    cell.innerHTML = '<img class="live-qr-image" alt="Profile QR" width="88" height="88">' +
+      '<div class="qractions live-actions"><a class="qrbtn live-open-profile" target="_blank" rel="noopener noreferrer">Open Profile</a><button class="qrbtn live-copy" type="button">Copy URL</button></div>' +
+      '<div class="muted live-qr-state" role="status"></div>';
     cell.querySelector(".live-open-profile").href = url;
     var image = cell.querySelector(".live-qr-image");
     image.src = qrImage(url);
@@ -287,11 +282,15 @@
         var button = this;
         button.textContent = "Copied";
         setTimeout(function () { button.textContent = "Copy URL"; }, 1800);
-      } catch (e) { status.textContent = "Copy failed · select the URL above"; }
+      } catch (e) {
+        var button = this;
+        button.textContent = "Copy failed";
+        setTimeout(function () { button.textContent = "Copy URL"; }, 1800);
+      }
     };
     image.onclick = function () {
       var dialog = document.createElement("dialog");
-      dialog.innerHTML = '<div class="live-qr-preview"><h3>Profile QR</h3><img alt="Profile QR" width="320" height="320"><p>Same QR · latest saved profile</p><button type="button">Close</button></div>';
+      dialog.innerHTML = '<div class="live-qr-preview"><h3>Profile QR</h3><img alt="Profile QR" width="320" height="320"><button type="button">Close</button></div>';
       dialog.querySelector("img").src = image.src;
       dialog.querySelector("button").onclick = function () { dialog.close(); };
       dialog.addEventListener("close", function () { dialog.remove(); }, { once: true });
@@ -354,7 +353,7 @@
   }
   function boot() {
     var style = document.createElement("style");
-    style.textContent = '.live-profile-cell{min-width:190px;max-width:270px;text-align:center}.live-profile-url{margin-bottom:8px}.live-url-link{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px}.live-qr-image{display:block;width:88px;height:88px;margin:auto;padding:4px;border:1px solid #eaecf0;border-radius:7px;background:#fff;cursor:zoom-in}.live-open-profile{display:inline-block;text-decoration:none;color:inherit}.live-qr-state{font-size:12px;line-height:1.35;margin-top:5px}.live-copy-row{margin-top:8px}.live-qr-preview{padding:18px;text-align:center}.live-qr-preview img{width:min(320px,75vw);height:auto;max-width:100%}.live-qr-preview p{color:#667085;font-size:13px}#form [hidden]{display:none!important}';
+    style.textContent = '.live-profile-cell{min-width:190px;max-width:270px;text-align:center}.live-qr-image{display:block;width:88px;height:88px;margin:auto;padding:4px;border:1px solid #eaecf0;border-radius:7px;background:#fff;cursor:zoom-in}.live-actions{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:nowrap;white-space:nowrap}.live-open-profile{display:inline-block;text-decoration:none;color:inherit}.live-qr-state{font-size:12px;line-height:1.35;margin-top:5px}.live-qr-preview{padding:18px;text-align:center}.live-qr-preview img{width:min(320px,75vw);height:auto;max-width:100%}#form [hidden]{display:none!important}';
     document.head.appendChild(style);
     var table = document.getElementById("table") || document.querySelector("table");
     if (table && table.tBodies.length) {
