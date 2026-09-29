@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var chartRoot, refreshTimer;
+  var chartRoot, refreshTimer, livePage = [], livePageReady = false;
   var imageStoreKey = "contactQrLessDenseImagesV4";
   var colors = {
     active: "#2563eb",
@@ -10,7 +10,8 @@
     company: "#7c3aed",
     both: "#16a34a",
     one: "#f59e0b",
-    neither: "#94a3b8"
+    neither: "#94a3b8",
+    unknown: "#e4e7ec"
   };
 
   function element(tag, className, text) {
@@ -19,25 +20,82 @@
     if (text !== undefined) node.textContent = String(text);
     return node;
   }
-  function records() {
-    if (Array.isArray(window.contacts)) return window.contacts.filter(Boolean);
-    try {
-      var keys = [];
-      for (var i = 0; i < localStorage.length; i++) {
-        var key = localStorage.key(i);
-        if (/^contactQrManagement/i.test(key)) keys.push(key);
-      }
-      keys.sort(function (a, b) {
-        return (Number((b.match(/\d+$/) || [0])[0]) || 0) -
-          (Number((a.match(/\d+$/) || [0])[0]) || 0);
+  function contactRows(value) {
+    var list = Array.isArray(value) ? value : value && value.contacts;
+    if (!Array.isArray(list)) return null;
+    var rows = list.filter(function (record) {
+      return record && typeof record === "object" && !Array.isArray(record) &&
+        ("id" in record || "contactName" in record || "firstName" in record);
+    });
+    return rows.length || !list.length ? rows : null;
+  }
+  function tableRecords() {
+    var table = document.getElementById("table") || document.querySelector("table");
+    if (!table || !table.tHead || !table.tBodies.length) return [];
+    var headers = Array.from(table.tHead.rows[0].cells, function (cell) {
+      return (cell.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    });
+    function column(name) {
+      return headers.findIndex(function (label) { return label.indexOf(name) === 0; });
+    }
+    var country = column("country"), company = column("company"), status = column("status");
+    if (country < 0 && company < 0 && status < 0) return [];
+    return Array.from(table.tBodies[0].rows).filter(function (row) {
+      return row.cells.length > 1;
+    }).map(function (row) {
+      function value(index) { return index < 0 ? "" : (row.cells[index] && row.cells[index].textContent || "").trim(); }
+      var idNode = row.querySelector("[data-id]");
+      var record = {
+        id: row.getAttribute("data-id") || idNode && idNode.getAttribute("data-id") || "",
+        country: value(country),
+        company: value(company),
+        isActive: /^active\b/i.test(value(status)),
+        __chartSource: "table"
+      };
+      Array.from(row.querySelectorAll("img")).forEach(function (image) {
+        var description = [image.alt, image.className].join(" ").toLowerCase();
+        if (/qr/.test(description)) return;
+        if (/background|cover/.test(description)) record.profileBackground = image.getAttribute("src") || "";
+        else if (/profile|avatar|photo/.test(description)) record.profileImage = image.getAttribute("src") || "";
       });
-      for (var j = 0; j < keys.length; j++) {
-        var parsed = JSON.parse(localStorage.getItem(keys[j]) || "null");
-        var list = Array.isArray(parsed) ? parsed : parsed && parsed.contacts;
-        if (Array.isArray(list)) return list.filter(Boolean);
+      return record;
+    });
+  }
+  function records() {
+    var direct = contactRows(window.contacts);
+    if (direct && direct.length) return { list: direct, scope: "all" };
+    try {
+      if (typeof contacts !== "undefined") {
+        var lexical = contactRows(contacts);
+        if (lexical && lexical.length) return { list: lexical, scope: "all" };
       }
     } catch (e) {}
-    return [];
+    try {
+      var candidates = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (key === imageStoreKey) continue;
+        try {
+          var list = contactRows(JSON.parse(localStorage.getItem(key) || "null"));
+          if (list && list.length) candidates.push({
+            key: key,
+            list: list,
+            preferred: /contact.*(?:qr|management)|(?:qr|management).*contact/i.test(key)
+          });
+        } catch (e) {}
+      }
+      candidates.sort(function (a, b) {
+        return Number(b.preferred) - Number(a.preferred) ||
+          (Number((b.key.match(/\d+$/) || [0])[0]) || 0) -
+          (Number((a.key.match(/\d+$/) || [0])[0]) || 0) ||
+          b.list.length - a.list.length;
+      });
+      if (candidates.length) return { list: candidates[0].list, scope: "all" };
+    } catch (e) {}
+    if (livePageReady) return { list: livePage, scope: "page" };
+    var visible = tableRecords();
+    if (visible.length) return { list: visible, scope: "page" };
+    return { list: direct || [], scope: "all" };
   }
   function savedImages() {
     try {
@@ -50,8 +108,14 @@
       ? ["profileImage", "profileImageData", "profilePhotoData", "avatarData"]
       : ["profileBackground", "profileBackgroundData", "backgroundImageData", "coverImageData", "backgroundData"];
     if (saved && typeof saved[kind] === "string" && saved[kind].trim()) return true;
+    if (record[kind === "profile" ? "_profileImageStored" : "_profileBackgroundStored"]) return true;
     return keys.some(function (key) {
       return typeof record[key] === "string" && !!record[key].trim();
+    }) || Object.keys(record).some(function (key) {
+      var label = key.toLowerCase(), value = record[key];
+      if (typeof value !== "string" || !value.trim() || /wechat|qr/.test(label)) return false;
+      return kind === "background" ? /background|cover/.test(label) :
+        /profile|avatar|photo/.test(label) && !/background|cover/.test(label);
     });
   }
   function countsBy(list, field) {
@@ -88,7 +152,7 @@
   }
   function statusChart(list) {
     var active = list.filter(function (record) {
-      return record.isActive === true || String(record.isActive).toLowerCase() === "true";
+      return record.isActive === true || /^(true|active|yes|1)$/i.test(String(record.isActive));
     }).length;
     var inactive = list.length - active;
     var node = card("Active vs inactive", "Contact status");
@@ -144,19 +208,21 @@
     return node;
   }
   function imageChart(list, images) {
-    var counts = { both: 0, one: 0, neither: 0 };
+    var counts = { both: 0, one: 0, neither: 0, unknown: 0 };
     list.forEach(function (record) {
       var saved = images[String(record.id || "")] || {};
       var n = Number(hasImage(record, "profile", saved)) +
         Number(hasImage(record, "background", saved));
-      counts[n === 2 ? "both" : n === 1 ? "one" : "neither"]++;
+      counts[record.__chartSource === "table" && n === 0 ? "unknown" :
+        n === 2 ? "both" : n === 1 ? "one" : "neither"]++;
     });
     var node = card("Profile image readiness", "Profile photo and background");
     var stack = element("div", "contact-chart-stack");
     stack.setAttribute("role", "img");
     stack.setAttribute("aria-label", counts.both + " with both images, " +
-      counts.one + " with one image, " + counts.neither + " with neither image");
-    ["both", "one", "neither"].forEach(function (key) {
+      counts.one + " with one image, " + counts.neither + " with neither image, " +
+      counts.unknown + " with image data unavailable");
+    ["both", "one", "neither", "unknown"].forEach(function (key) {
       if (!counts[key]) return;
       var segment = element("span");
       segment.style.width = (counts[key] / list.length * 100) + "%";
@@ -164,11 +230,15 @@
       stack.appendChild(segment);
     });
     node.appendChild(stack);
-    legend(node, [
+    var items = [
       { label: "Both images", count: counts.both, color: colors.both },
       { label: "One image", count: counts.one, color: colors.one },
       { label: "Neither", count: counts.neither, color: colors.neither }
-    ]);
+    ];
+    if (counts.unknown) items.push({
+      label: "Image data unavailable", count: counts.unknown, color: colors.unknown
+    });
+    legend(node, items);
     return node;
   }
   function ensureRoot() {
@@ -197,9 +267,10 @@
   }
   function render() {
     var root = ensureRoot();
-    var list = records();
+    var source = records(), list = source.list;
     root.querySelector(".contact-charts-total").textContent =
-      list.length + (list.length === 1 ? " contact" : " contacts");
+      list.length + (source.scope === "page" ? " on this page" :
+        list.length === 1 ? " contact" : " contacts");
     var grid = root.querySelector(".contact-charts-grid");
     grid.replaceChildren(
       statusChart(list),
@@ -244,6 +315,11 @@
     if (form) form.addEventListener("submit", function () {
       setTimeout(render, 350);
       setTimeout(render, 1000);
+    });
+    document.addEventListener("contact-qr-chart-page", function (event) {
+      livePage = contactRows(event.detail) || [];
+      livePageReady = true;
+      scheduleRender();
     });
     window.addEventListener("storage", scheduleRender);
   }

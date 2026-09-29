@@ -306,6 +306,14 @@
     if (profile) profilesByRow.set(row, profile);
     else profile = profilesByRow.get(row);
     if (!profile) { renderCell(cell, id, "Profile data unavailable"); return; }
+    var summary = {
+      id: id,
+      country: profile.country || "",
+      company: profile.company || "",
+      isActive: profile.isActive,
+      profileImage: profile.profileImage || profile.profileImageData || profile.profilePhotoData || profile.avatarData ? "present" : "",
+      profileBackground: profile.profileBackground || profile.profileBackgroundData || profile.backgroundImageData || profile.coverImageData ? "present" : ""
+    };
     renderCell(cell, id, "Saving latest profile…");
     try {
       var images = await imagesFor(id);
@@ -322,6 +330,7 @@
     } catch (e) {
       renderCell(cell, id, "Storage not ready", e && e.message ? e.message : String(e));
     }
+    return summary;
   }
   async function sync() {
     if (syncing) { queued = true; return; }
@@ -337,11 +346,14 @@
       if (index < 0) return;
       header.cells[index].textContent = "Public URL + Profile QR";
       var rows = Array.from(table.tBodies[0].rows);
+      var summaries = [];
       for (var i = 0; i < rows.length; i++) {
         var oldDownload = rows[i].querySelector('[data-a="downloadqr"]');
         if (oldDownload) oldDownload.remove();
-        await syncRow(rows[i], index);
+        var summary = await syncRow(rows[i], index);
+        if (summary) summaries.push(summary);
       }
+      document.dispatchEvent(new CustomEvent("contact-qr-chart-page", { detail: summaries }));
     } finally {
       syncing = false;
       if (queued) { queued = false; scheduleSync(); }
