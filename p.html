@@ -12,30 +12,62 @@ h1{font-size:20px;margin:0 0 8px}.muted{color:#667085;font-size:13px;line-height
 </style>
 </head>
 <body>
-<div class="card"><h1>Opening profile…</h1><div id="status" class="muted">Loading the hosted contact profile.</div></div>
+<div class="card"><h1>Opening profile…</h1><div id="status" class="muted">Loading the latest saved contact profile.</div></div>
 <script>
 "use strict";
 function b64url(text){
-  var bytes=new TextEncoder().encode(text),bin="",chunk=0x6000;
+  var bytes=new TextEncoder().encode(String(text||"")),bin="",chunk=0x6000;
   for(var i=0;i<bytes.length;i+=chunk){
     var part=bytes.subarray(i,Math.min(bytes.length,i+chunk));
     for(var j=0;j<part.length;j++)bin+=String.fromCharCode(part[j]);
   }
   return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-(async function(){
-  var code=(location.hash||"").replace(/^#/,"").trim()||new URLSearchParams(location.search).get("id")||"";
-  code=code.toUpperCase();
+function decodeBase64Url(s){
+  s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");
+  while(s.length%4)s+="=";
+  var bin=atob(s),bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function validRemote(uri){
   try{
+    var u=new URL(uri);
+    return u.protocol==="https:"&&u.hostname==="api.jsonstorage.net"&&u.pathname.indexOf("/v1/json/")===0?u.href:"";
+  }catch(e){return ""}
+}
+function openProfile(profile){
+  if(!profile||typeof profile!=="object"||Array.isArray(profile))throw new Error("Invalid profile data.");
+  var token="ld_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,10);
+  sessionStorage.setItem("contactQrRemoteProfile:"+token,JSON.stringify(profile));
+  var target=new URL("./profile.html",location.href);
+  target.search="";
+  target.hash="s="+encodeURIComponent(token);
+  location.replace(target.href);
+}
+(async function(){
+  var hash=(location.hash||"").replace(/^#/,"");
+  try{
+    var remoteMatch=hash.match(/(?:^|&)r=([^&]+)/);
+    if(remoteMatch){
+      var uri=validRemote(decodeBase64Url(remoteMatch[1]));
+      if(!uri)throw new Error("Invalid live profile link.");
+      var res=await fetch(uri,{cache:"no-store"});
+      if(!res.ok)throw new Error("Unable to load the latest profile.");
+      var profile=await res.json();
+      openProfile(profile);
+      return;
+    }
+
+    // Legacy demo QR fallback.
+    var code=hash.trim()||new URLSearchParams(location.search).get("id")||"";
+    code=code.toUpperCase();
     if(!code)throw new Error("Missing profile ID.");
-    var res=await fetch("./profiles.json",{cache:"no-store"});
-    if(!res.ok)throw new Error("Unable to load profile store.");
-    var profiles=await res.json(),profile=profiles[code];
-    if(!profile)throw new Error("Profile not found.");
-    var target=new URL("./profile.html",location.href);
-    target.search="";
-    target.hash="p="+b64url(JSON.stringify(profile));
-    location.replace(target.href);
+    var old=await fetch("./profiles.json",{cache:"no-store"});
+    if(!old.ok)throw new Error("Unable to load legacy profile store.");
+    var profiles=await old.json(),legacy=profiles[code];
+    if(!legacy)throw new Error("Profile not found.");
+    openProfile(legacy);
   }catch(e){
     document.querySelector("h1").textContent="Profile unavailable";
     document.getElementById("status").textContent=e&&e.message?e.message:"Unable to open this profile.";
